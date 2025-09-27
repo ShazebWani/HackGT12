@@ -23,64 +23,14 @@ export default function Home() {
     setAudioStatus('idle')
     // Start processing state when recording stops
     setIsProcessing(true)
-    // The AudioRecorder will handle navigation after delay
   }
 
-  // Mock data for testing the ResultsDisplay component
-  const mockResults = {
-    transcription: "Patient is a 34-year-old male presenting with sore throat, fever, and swollen lymph nodes. Rapid strep test was positive. Diagnosis is acute streptococcal pharyngitis. I'm prescribing Amoxicillin 500mg, twice daily for 10 days, and ordering a follow-up throat culture.",
-    soap_note: `SUBJECTIVE:
-34-year-old male presents with chief complaint of sore throat for 3 days. Patient reports associated fever (101.2°F), difficulty swallowing, and tender swollen lymph nodes in neck. Denies cough, runny nose, or body aches. No known sick contacts.
-
-OBJECTIVE:
-Vital Signs: T 101.2°F, BP 128/78, HR 88, RR 16, O2 Sat 98%
-Physical Exam:
-- HEENT: Erythematous throat with tonsillar exudate, tender anterior cervical lymphadenopathy
-- Lungs: Clear to auscultation bilaterally
-- Heart: Regular rate and rhythm
-
-ASSESSMENT:
-Acute streptococcal pharyngitis (strep throat)
-Rapid strep test: Positive
-
-PLAN:
-1. Antibiotic therapy: Amoxicillin 500mg PO BID x 10 days
-2. Supportive care: Rest, fluids, throat lozenges
-3. Follow-up throat culture in 48-72 hours
-4. Return if symptoms worsen or no improvement in 3-4 days`,
-    diagnosis: "acute streptococcal pharyngitis",
-    billing_code: {
-      code: "J02.0",
-      description: "Streptococcal pharyngitis"
-    },
-    prescriptions: [
-      {
-        medication: "Amoxicillin",
-        dosage: "500mg",
-        frequency: "Twice daily",
-        duration: "10 days"
-      },
-      {
-        medication: "Throat Lozenges",
-        dosage: "As needed",
-        frequency: "Every 2-4 hours",
-        duration: "Until symptoms resolve"
-      }
-    ],
-    lab_orders: [
-      "throat culture",
-      "complete blood count with differential"
-    ]
+  const handleRecordingResults = (recordingResults: any) => {
+    // Set the results from the recording
+    setResults(recordingResults)
+    setIsProcessing(false)
   }
 
-  const loadMockData = () => {
-    setIsProcessing(true)
-    // Simulate processing time
-    setTimeout(() => {
-      setResults(mockResults)
-      setIsProcessing(false)
-    }, 2000)
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-medical-50 to-primary-50">
@@ -160,6 +110,7 @@ PLAN:
                 status={audioStatus}
                 startRecording={startRecording}
                 stopRecording={stopRecording}
+                onResults={handleRecordingResults}
               />
             ) : (
               <FileUploader onResults={setResults} onProcessing={setIsProcessing} />
@@ -196,20 +147,13 @@ PLAN:
         <div className="mt-8 medical-card bg-blue-50 border-blue-200">
           <div className="flex items-start space-x-3">
             <CheckCircle className="h-6 w-6 text-blue-600 mt-0.5" />
-            <div className="flex-1">
+            <div>
               <h4 className="font-medium text-blue-900">Demo Ready</h4>
-              <p className="text-blue-700 mt-1 mb-3">
+              <p className="text-blue-700 mt-1">
                 Try saying: "Patient is a 34-year-old male presenting with sore throat, fever, and swollen lymph nodes. 
                 Rapid strep test was positive. Diagnosis is acute streptococcal pharyngitis. 
                 I'm prescribing Amoxicillin 500mg, twice daily for 10 days, and ordering a follow-up throat culture."
               </p>
-              <button 
-                onClick={loadMockData}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-                disabled={isProcessing}
-              >
-                {isProcessing ? 'Loading...' : 'Load Sample Results'}
-              </button>
             </div>
           </div>
         </div>
