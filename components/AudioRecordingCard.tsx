@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Mic } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -10,7 +10,6 @@ interface AudioRecordingProps {
 }
 
 const AudioRecordingCard = ({ audioStatus, startRecording, stopRecording, handleRecordingResults }: AudioRecordingProps) => {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const [audioResults, setAudioResults] = useState<any>(null)
@@ -146,7 +145,26 @@ PLAN:
         stopAll()
       }, 2200) // 2.2s processing simulation
     }
-  }, [audioStatus, startRecording, stopRecording, handleRecordingResults])
+  }, [stopRecording])
+
+  const handleRecordClick = useCallback(() => {
+    if (audioStatus === 'idle') {
+      startRealRecording()
+    } else {
+      stopRealRecording()
+    }
+  }, [audioStatus, startRealRecording, stopRealRecording])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+      // Clear any remaining audio data
+      audioChunksRef.current = []
+    }
+  }, [])
 
   return (
     <div className="medical-card">
@@ -211,13 +229,14 @@ PLAN:
 
         {/* Instructions */}
         <div className="text-xs text-gray-500 space-y-1 mt-4">
-          <p>• Make sure your microphone is enabled</p>
+          <p>• Allow microphone access when prompted</p>
           <p>• Speak clearly and at normal pace</p>
+          <p>• Audio is recorded in memory only (not saved to disk)</p>
           <p>• Click stop when finished to get full analysis</p>
         </div>
         
         <div className="mt-4 text-xs text-gray-500">
-          <p>Or drag and drop audio files (WAV, MP3, M4A)</p>
+          <p>Audio data is processed and discarded after analysis</p>
         </div>
       </div>
     </div>
