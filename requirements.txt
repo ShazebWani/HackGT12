@@ -6,3 +6,9 @@ assemblyai
 databases[sqlite]
 SQLAlchemy
 python-dotenv
+
+sounddevice
+soundfile
+numpy
+openai
+
