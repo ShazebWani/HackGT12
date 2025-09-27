@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Search, User } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import PatientInfoCard from '../components/PatientInfoCard'
 import AudioRecordingCard from '../components/AudioRecordingCard'
 import TextFileUploadCard from '../components/TextFileUploadCard'
-import ResultsDisplay from '../components/ResultsDisplay'
+import ResultsCard from '@/components/ResultsCard'
+import ProcessingIndicator from '@/components/ProcessingIndicator'
 import { usePatient } from '../contexts/PatientContext'
 
 export default function Home() {
@@ -33,6 +34,32 @@ export default function Home() {
   const handleRecordingResults = (recordingResults: any) => {
     setResults(recordingResults)
     setIsProcessing(false)
+  }
+
+  // Auto-scroll to results when they appear
+  useEffect(() => {
+    if (results) {
+      // Small delay to ensure the results section is rendered
+      setTimeout(() => {
+        const resultsSection = document.getElementById('results-section')
+        if (resultsSection) {
+          resultsSection.scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'start'
+          })
+        }
+      }, 100)
+    }
+  }, [results])
+
+  const scrollToResults = () => {
+    const resultsSection = document.getElementById('results-section')
+    if (resultsSection) {
+      resultsSection.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      })
+    }
   }
 
   const handleTextFileUpload = (file: File) => {
@@ -68,8 +95,64 @@ Follow-up: ${medicalData.followUpInstructions}`,
   // Get results from active patient or current results
   const displayResults = results || getResultsFromPatient(activePatient);
 
+  // Enforce auth/redirect based on role
+  useEffect(() => {
+    const auth = localStorage.getItem('auth')
+    if (!auth) {
+      // Not authenticated — send to login
+      window.location.href = '/login'
+      return
+    }
+    // If a patient is logged in, do NOT auto-redirect here to avoid
+    // unexpected routing during in-app navigation. The patient can
+    // navigate to /messages via the sidebar or the login flow.
+    try {
+      const user = JSON.parse(auth)
+      // optional: could show a toast or UI hint here instead of redirecting
+      console.debug('Logged in user:', user.username, 'role:', user.role)
+    } catch (e) {
+      window.location.href = '/login'
+    }
+  }, [])
+
+  // Helper: append a message to localStorage for a recipient (messages:username)
+  const appendMessageForUser = (recipient: string, message: any) => {
+    if (!recipient) return false
+    const key = `messages:${recipient}`
+    try {
+      const existing = JSON.parse(localStorage.getItem(key) || '[]')
+      existing.push(message)
+      localStorage.setItem(key, JSON.stringify(existing))
+      return true
+    } catch (e) {
+      console.error('failed to append message', e)
+      return false
+    }
+  }
+
+  const sendResultsToPatient = () => {
+    const authRaw = localStorage.getItem('auth')
+    const user = authRaw ? JSON.parse(authRaw) : { username: 'Doctor' }
+    const recipient = patientName?.trim()
+    if (!recipient) {
+      alert('Please enter patient name in Patient Info before sending results.')
+      return
+    }
+
+    const msg = {
+      from: user.username || 'Doctor',
+      type: 'results',
+      body: `Medical results for ${recipient}: ${results ? results.diagnosis || 'No diagnosis' : 'No results'}`,
+      meta: { results },
+      timestamp: Date.now()
+    }
+
+    const ok = appendMessageForUser(recipient, msg)
+    if (ok) alert('Results sent to patient portal')
+  }
+
   return (
-    <div className="flex h-screen min-h-screen bg-base">
+    <div className="flex h-screen min-h-screen bg-base overflow-clip">
       <Sidebar />
       <div className='flex-1 overflow-auto p-6'>
         <div className="max-w-6xl mx-auto">
@@ -112,7 +195,7 @@ Follow-up: ${medicalData.followUpInstructions}`,
           {/* Results Area */}
           {displayResults && (
             <div className="medical-card">
-              <ResultsDisplay results={displayResults} />
+              <ResultsCard results={displayResults} />
             </div>
           )}
           
@@ -144,16 +227,8 @@ Follow-up: ${medicalData.followUpInstructions}`,
               <p className="text-gray-500">
                 Select a patient from the sidebar or create a new patient to get started.
               </p>
-            </div>
-          )}
-          
-          {isProcessing && (
-            <div className="medical-card text-center">
-              <div className="animate-spin h-8 w-8 border-4 border-accent-1 border-t-transparent rounded-full mx-auto mb-4"></div>
-              <p className="text-accent-1">Processing...</p>
-            </div>
-          )}
-        </div>
+            </div>)}
+          </div>
       </div>
     </div>
   )
