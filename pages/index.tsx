@@ -6,8 +6,31 @@ import ResultsDisplay from '../components/ResultsDisplay'
 
 export default function Home() {
   const [mode, setMode] = useState<'streaming' | 'upload'>('streaming')
-  const [results, setResults] = useState(null)
+  const [results, setResults] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  
+  // Audio recorder state
+  const [audioStatus, setAudioStatus] = useState<'idle' | 'recording'>('idle')
+
+  const startRecording = () => {
+    setAudioStatus('recording')
+    // Clear any existing results when starting new recording
+    setResults(null)
+    setIsProcessing(false)
+  }
+  
+  const stopRecording = () => {
+    setAudioStatus('idle')
+    // Start processing state when recording stops
+    setIsProcessing(true)
+  }
+
+  const handleRecordingResults = (recordingResults: any) => {
+    // Set the results from the recording
+    setResults(recordingResults)
+    setIsProcessing(false)
+  }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-medical-50 to-primary-50">
@@ -83,7 +106,12 @@ export default function Home() {
             </h3>
             
             {mode === 'streaming' ? (
-              <AudioRecorder onResults={setResults} onProcessing={setIsProcessing} />
+              <AudioRecorder
+                status={audioStatus}
+                startRecording={startRecording}
+                stopRecording={stopRecording}
+                onResults={handleRecordingResults}
+              />
             ) : (
               <FileUploader onResults={setResults} onProcessing={setIsProcessing} />
             )}
@@ -100,7 +128,8 @@ export default function Home() {
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
                   <Clock className="h-12 w-12 text-medical-500 mx-auto mb-4 animate-spin" />
-                  <p className="text-gray-600">Processing medical data...</p>
+                  <p className="text-gray-600 mb-2">Processing your recording...</p>
+                  <p className="text-sm text-gray-500">Transcribing audio and generating clinical documentation</p>
                 </div>
               </div>
             ) : results ? (
