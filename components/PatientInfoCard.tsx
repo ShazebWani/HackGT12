@@ -1,4 +1,7 @@
-import { User } from 'lucide-react'
+import { useState } from 'react'
+import { User, Search, Plus, X } from 'lucide-react'
+import { usePatient } from '../contexts/PatientContext'
+import { Patient } from '../lib/types'
 
 interface PatientInfoProps {
   patientName: string
@@ -8,40 +11,279 @@ interface PatientInfoProps {
 }
 
 const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDob }: PatientInfoProps) => {
-  return (
-    <div className="medical-card mb-6">
-      <div className="flex items-center gap-2 mb-4">
-        <User className="h-5 w-5 text-accent-1" />
-        <h2 className="text-lg font-semibold text-accent-1">Patient Information</h2>
-      </div>
+  const { 
+    state, 
+    selectPatient, 
+    upsertPatient, 
+    touchPatient, 
+    setPendingNewPatient 
+  } = usePatient();
+
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [mrn, setMrn] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
+  const [showNewPatientModal, setShowNewPatientModal] = useState(false)
+
+  // Generate a new MRN
+  const generateMRN = () => {
+    const timestamp = Date.now().toString().slice(-5);
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `MRN-${timestamp}${random}`;
+  };
+
+  // Find patient by criteria
+  const findPatient = (firstName: string, lastName: string, dob: string, mrn?: string) => {
+    return state.patients.find(patient => {
+      if (mrn && mrn.trim()) {
+        return patient.mrn.toLowerCase() === mrn.toLowerCase().trim();
+      }
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Patient Name
-          </label>
-          <input
-            type="text"
-            value={patientName}
-            onChange={(e) => setPatientName(e.target.value)}
-            placeholder="Enter patient name"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors"
-          />
+      return (
+        patient.firstName.toLowerCase() === firstName.toLowerCase().trim() &&
+        patient.lastName.toLowerCase() === lastName.toLowerCase().trim() &&
+        patient.dateOfBirth === dob
+      );
+    });
+  };
+
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate required fields
+    if (!firstName.trim() || !lastName.trim() || !dateOfBirth) {
+      alert('Please fill in all required fields (First Name, Last Name, Date of Birth)');
+      return;
+    }
+
+    // Try to find existing patient
+    const existingPatient = findPatient(firstName, lastName, dateOfBirth, mrn);
+
+    if (existingPatient) {
+      // Patient found - select them and optionally bump recency
+      selectPatient(existingPatient.id);
+      touchPatient(existingPatient.id);
+      
+      // Update the legacy form fields for compatibility
+      setPatientName(`${existingPatient.firstName} ${existingPatient.lastName}`);
+      setPatientDob(existingPatient.dateOfBirth);
+      
+      // Clear form
+      clearForm();
+    } else {
+      // Patient not found - set up for creation
+      setPendingNewPatient({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        dateOfBirth,
+        mrn: mrn.trim() || generateMRN()
+      });
+      setShowNewPatientModal(true);
+    }
+  };
+
+  // Handle new patient creation
+  const handleCreatePatient = () => {
+    if (!state.pendingNewPatient) return;
+
+    const newPatient: Patient = {
+      id: `patient-${Date.now()}`,
+      mrn: state.pendingNewPatient.mrn || generateMRN(),
+      firstName: state.pendingNewPatient.firstName!,
+      lastName: state.pendingNewPatient.lastName!,
+      dateOfBirth: state.pendingNewPatient.dateOfBirth!,
+      lastUpdated: new Date().toISOString(),
+      // No medical data initially
+    };
+
+    upsertPatient(newPatient);
+    
+    // Update legacy form fields
+    setPatientName(`${newPatient.firstName} ${newPatient.lastName}`);
+    setPatientDob(newPatient.dateOfBirth);
+    
+    // Close modal and clear forms
+    setShowNewPatientModal(false);
+    setPendingNewPatient(null);
+    clearForm();
+  };
+
+  // Clear form fields
+  const clearForm = () => {
+    setFirstName('');
+    setLastName('');
+    setMrn('');
+    setDateOfBirth('');
+  };
+
+  // Cancel new patient creation
+  const handleCancelCreate = () => {
+    setShowNewPatientModal(false);
+    setPendingNewPatient(null);
+  };
+
+  return (
+    <>
+      <div className="medical-card mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <User className="h-5 w-5 text-accent-1" />
+          <h2 className="text-lg font-semibold text-accent-1">Patient Information</h2>
         </div>
         
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Date of Birth
-          </label>
-          <input
-            type="date"
-            value={patientDob}
-            onChange={(e) => setPatientDob(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors"
-          />
+        <form onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                First Name *
+              </label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Enter first name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Last Name *
+              </label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Enter last name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Date of Birth *
+              </label>
+              <input
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                MRN (Optional)
+              </label>
+              <input
+                type="text"
+                value={mrn}
+                onChange={(e) => setMrn(e.target.value)}
+                placeholder="Enter MRN"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors"
+              />
+            </div>
+          </div>
+          
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              className="flex items-center gap-2 px-4 py-2 bg-accent-1 text-white rounded-lg hover:bg-accent-1/90 transition-colors"
+            >
+              <Search className="h-4 w-4" />
+              Find or Create Patient
+            </button>
+            
+            <button
+              type="button"
+              onClick={clearForm}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </form>
+
+        {/* Legacy fields for backward compatibility */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 pt-6 border-t border-gray-200">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Patient Name (Legacy)
+            </label>
+            <input
+              type="text"
+              value={patientName}
+              onChange={(e) => setPatientName(e.target.value)}
+              placeholder="Enter patient name"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors"
+              disabled
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Date of Birth (Legacy)
+            </label>
+            <input
+              type="date"
+              value={patientDob}
+              onChange={(e) => setPatientDob(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors"
+              disabled
+            />
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* New Patient Modal */}
+      {showNewPatientModal && state.pendingNewPatient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Create New Patient</h3>
+              <button
+                onClick={handleCancelCreate}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="space-y-3 mb-6">
+              <p className="text-gray-600">
+                No existing patient found with these details. Would you like to create a new patient record?
+              </p>
+              
+              <div className="bg-gray-50 p-3 rounded-lg space-y-1">
+                <p><strong>Name:</strong> {state.pendingNewPatient.firstName} {state.pendingNewPatient.lastName}</p>
+                <p><strong>DOB:</strong> {state.pendingNewPatient.dateOfBirth}</p>
+                <p><strong>MRN:</strong> {state.pendingNewPatient.mrn}</p>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={handleCreatePatient}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-accent-1 text-white rounded-lg hover:bg-accent-1/90 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Create Patient
+              </button>
+              
+              <button
+                onClick={handleCancelCreate}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
