@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { FileText, Pill, TestTube, CreditCard, User, ChevronRight } from 'lucide-react'
+import { FileText, Pill, TestTube, CreditCard, User, ChevronRight, Check } from 'lucide-react'
+import { usePatient } from '../contexts/PatientContext'
 
 interface ResultsDisplayProps {
   results: {
@@ -23,8 +24,26 @@ interface ResultsDisplayProps {
 
 export default function ResultsDisplay({ results }: ResultsDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isApproved, setIsApproved] = useState(false)
+  const { activePatient, touchPatient } = usePatient()
 
   if (!results) return null
+
+  // Handle approve and sign
+  const handleApproveAndSign = () => {
+    setIsApproved(true);
+    
+    // Update the active patient's lastUpdated timestamp to move them to top of sidebar
+    if (activePatient) {
+      touchPatient(activePatient.id);
+    }
+    
+    // You could add additional logic here like:
+    // - Send to EHR system
+    // - Generate PDF
+    // - Update patient status
+    console.log('Document approved and signed for patient:', activePatient?.firstName, activePatient?.lastName);
+  };
 
   return (
     <div>
@@ -190,8 +209,23 @@ export default function ResultsDisplay({ results }: ResultsDisplayProps) {
 
             {/* Action Buttons */}
             <div className="flex space-x-4 pt-6 border-t border-gray-200 sticky bottom-0 bg-white">
-              <button className="flex-1 bg-medical-600 hover:bg-medical-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md">
-                Approve & Sign
+              <button 
+                onClick={handleApproveAndSign}
+                disabled={isApproved}
+                className={`flex-1 flex items-center justify-center gap-2 font-semibold py-3 px-6 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md ${
+                  isApproved 
+                    ? 'bg-green-600 text-white cursor-default' 
+                    : 'bg-medical-600 hover:bg-medical-700 text-white'
+                }`}
+              >
+                {isApproved ? (
+                  <>
+                    <Check className="h-5 w-5" />
+                    Approved & Signed
+                  </>
+                ) : (
+                  'Approve & Sign'
+                )}
               </button>
               <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md">
                 Edit & Review
