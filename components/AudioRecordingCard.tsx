@@ -13,6 +13,9 @@ const AudioRecordingCard = ({ audioStatus, startRecording, stopRecording, handle
   const [isProcessing, setIsProcessing] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const [audioResults, setAudioResults] = useState<any>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const audioChunksRef = useRef<BlobPart[]>([])
 
   function getWsUrl() {
     if (typeof window === 'undefined') return 'ws://localhost:8000/ws/transcription'
@@ -146,14 +149,6 @@ PLAN:
       }, 2200) // 2.2s processing simulation
     }
   }, [stopRecording])
-
-  const handleRecordClick = useCallback(() => {
-    if (audioStatus === 'idle') {
-      startRealRecording()
-    } else {
-      stopRealRecording()
-    }
-  }, [audioStatus, startRealRecording, stopRealRecording])
 
   // Cleanup on unmount
   useEffect(() => {
