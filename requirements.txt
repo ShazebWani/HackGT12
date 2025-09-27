@@ -3,3 +3,7 @@ uvicorn[standard]
 python-multipart
 websockets
 assemblyai
+databases[sqlite]
+SQLAlchemy
+python-dotenv
+openai
