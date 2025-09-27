@@ -7,3 +7,4 @@ assemblyai
 sounddevice
 soundfile
 numpy
+openai

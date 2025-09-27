@@ -6,6 +6,8 @@ import csv
 import os
 import asyncio
 import assemblyai as aai
+from backend.realtime_transcribe import AudioTranscribe
+import threading
 import json
 
 # Initialize FastAPI app
@@ -318,7 +320,6 @@ async def websocket_process_visit(websocket: WebSocket):
                     lab_orders=entities["lab_orders"]
                 )
                 
-                # Step 6: Send final structured result to client
                 await websocket.send_json({
                     "type": "final_result",
                     "data": final_response.dict()
@@ -339,3 +340,106 @@ async def websocket_process_visit(websocket: WebSocket):
         print(f"WebSocket error: {e}")
     finally:
         print("Client disconnected")
+
+
+@app.websocket("/ws/transcription")
+async def transcription(websocket: WebSocket):
+    await websocket.accept()
+    print("WebSocket transcription connection established")
+
+    stop_event = threading.Event()
+    transcriber = AudioTranscribe()
+
+    transcript_queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    
+    # State variable to track if final result has been sent
+    final_result_sent = False # <-- New state tracker
+
+    def on_final_cb(full_text: str):
+        print("on_final_cb")
+        try:
+            print("sent")
+            transcript_queue.put_nowait({
+                "type": "final_result",
+                "data": {"transcription": full_text.strip()},
+                "is_final": True
+            })
+            
+        except asyncio.QueueFull:
+            print("Queue full, could not enqueue final_result")
+
+    def run_transcriber():
+        transcriber.run( stop_event=stop_event, on_final=on_final_cb)
+
+        
+
+    thread = threading.Thread(target=run_transcriber, daemon=True)
+    thread.start()
+
+    try:
+        while True:
+            recv_task = asyncio.create_task(websocket.receive_text()) # Changed to _text for safety
+            q_task = asyncio.create_task(transcript_queue.get())
+            done, pending = await asyncio.wait(
+                [recv_task, q_task],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+
+            # 1. Handle incoming WS messages (client closing or END_OF_STREAM)
+            if recv_task in done:
+                try:
+                    # Use receive_text() if we only expect JSON text
+                    text = recv_task.result() 
+                    data = json.loads(text)
+                    if data.get("type") == "END_OF_STREAM":
+                        print("Received END_OF_STREAM from client. Setting stop event.")
+                        stop_event.set()
+                except WebSocketDisconnect:
+                    print("Client disconnected (recv)")
+                    break
+                except Exception as e:
+                    # Handles JSON decode error or other receive issues
+                    print(f"Error receiving message: {e}")
+                    # If an error happens while waiting for END_OF_STREAM, we break.
+                    break 
+
+            # 2. Handle transcripts from queue
+            if q_task in done:
+                transcript_item = q_task.result()
+                try:
+                    await websocket.send_json(transcript_item)
+                    if transcript_item.get("type") == "final_result":
+                        print("Final result sent. Waiting for client to close connection.")
+                        final_result_sent = True
+                except Exception as e:
+                    print(f"Error sending transcript: {e}")
+                    # If send fails, we assume the connection is dead and break
+                    break 
+
+            # 3. Cancel pending tasks
+            for p in pending:
+                p.cancel()
+
+            # 4. Break condition: Only break if the final result has been sent
+            # AND the stop event is set AND the queue is empty.
+            # However, since the client is supposed to close after final_result,
+            # we can simplify and wait for the subsequent WebSocketDisconnect.
+            if final_result_sent and transcript_queue.empty():
+                # We sent the final result. Now, we loop again to wait for the
+                # inevitable WebSocketDisconnect from the client.
+                pass 
+
+            if stop_event.is_set() and transcript_queue.empty() and final_result_sent:
+                print("Stop event set and queue empty, but no final result. Closing.")
+                return
+            
+    except WebSocketDisconnect:
+        print("Client disconnected from transcription websocket")
+    finally:
+        # Ensure thread stops cleanly
+        stop_event.set()
+        if thread.is_alive():
+            thread.join(timeout=2.0)
+            print("Transcriber thread joined.")
+        print("Transcription websocket handler exiting")
