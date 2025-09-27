@@ -62,6 +62,62 @@ export default function Home() {
     // Here you could read the file content and process it
   }
 
+  // Enforce auth/redirect based on role
+  useEffect(() => {
+    const auth = localStorage.getItem('auth')
+    if (!auth) {
+      // Not authenticated — send to login
+      window.location.href = '/login'
+      return
+    }
+    // If a patient is logged in, do NOT auto-redirect here to avoid
+    // unexpected routing during in-app navigation. The patient can
+    // navigate to /messages via the sidebar or the login flow.
+    try {
+      const user = JSON.parse(auth)
+      // optional: could show a toast or UI hint here instead of redirecting
+      console.debug('Logged in user:', user.username, 'role:', user.role)
+    } catch (e) {
+      window.location.href = '/login'
+    }
+  }, [])
+
+  // Helper: append a message to localStorage for a recipient (messages:username)
+  const appendMessageForUser = (recipient: string, message: any) => {
+    if (!recipient) return false
+    const key = `messages:${recipient}`
+    try {
+      const existing = JSON.parse(localStorage.getItem(key) || '[]')
+      existing.push(message)
+      localStorage.setItem(key, JSON.stringify(existing))
+      return true
+    } catch (e) {
+      console.error('failed to append message', e)
+      return false
+    }
+  }
+
+  const sendResultsToPatient = () => {
+    const authRaw = localStorage.getItem('auth')
+    const user = authRaw ? JSON.parse(authRaw) : { username: 'Doctor' }
+    const recipient = patientName?.trim()
+    if (!recipient) {
+      alert('Please enter patient name in Patient Info before sending results.')
+      return
+    }
+
+    const msg = {
+      from: user.username || 'Doctor',
+      type: 'results',
+      body: `Medical results for ${recipient}: ${results ? results.diagnosis || 'No diagnosis' : 'No results'}`,
+      meta: { results },
+      timestamp: Date.now()
+    }
+
+    const ok = appendMessageForUser(recipient, msg)
+    if (ok) alert('Results sent to patient portal')
+  }
+
   return (
     <div className="flex h-screen min-h-screen bg-base overflow-clip">
       <Sidebar />
@@ -104,7 +160,7 @@ export default function Home() {
         {results && (
           <div id="results-section" className="min-h-screen p-6">
             <div className="max-w-6xl mx-auto">
-              <ResultsCard results={results} />
+              <ResultsCard results={results} onSend={sendResultsToPatient} />
             </div>
           </div>
         )}
