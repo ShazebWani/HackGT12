@@ -14,7 +14,8 @@ export default function Home() {
   const [patientDob, setPatientDob] = useState('')
   const [results, setResults] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  
+  const [isAudio, setIsAudio] = useState(false)
+
   // Audio recorder state
   const [audioStatus, setAudioStatus] = useState<'idle' | 'recording'>('idle')
   
@@ -26,16 +27,23 @@ export default function Home() {
     setResults(null)
     setIsProcessing(false)
   }
-  
+
   const stopRecording = () => {
     setAudioStatus('idle')
     setIsProcessing(true)
   }
 
   const handleRecordingResults = (recordingResults: any) => {
-    setResults(recordingResults)
-    setIsProcessing(false)
-  }
+    console.log("Recording results:", recordingResults);
+
+    if (!recordingResults) return;
+
+    // Always set just the transcription string, not the whole object
+    const text = recordingResults.transcription;
+
+    setIsAudio(text);  // <-- store string, not object
+    setIsProcessing(!recordingResults.isFinal); // still use isFinal for processing state
+  };
 
   // Auto-scroll to results when they appear
   useEffect(() => {

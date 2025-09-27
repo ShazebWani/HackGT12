@@ -3,3 +3,8 @@ uvicorn[standard]
 python-multipart
 websockets
 assemblyai
+
+sounddevice
+soundfile
+numpy
+openai
