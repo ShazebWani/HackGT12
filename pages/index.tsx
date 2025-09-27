@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Search, User } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import PatientInfoCard from '../components/PatientInfoCard'
+import PatientDisplayCard from '../components/PatientDisplayCard'
 import AudioRecordingCard from '../components/AudioRecordingCard'
 import TextFileUploadCard from '../components/TextFileUploadCard'
 import ResultsCard from '@/components/ResultsCard'
@@ -18,7 +19,7 @@ export default function Home() {
   const [audioStatus, setAudioStatus] = useState<'idle' | 'recording'>('idle')
   
   // Patient context
-  const { setSearchQuery, state, activePatient } = usePatient()
+  const { state, activePatient } = usePatient()
 
   const startRecording = () => {
     setAudioStatus('recording')
@@ -156,41 +157,34 @@ Follow-up: ${medicalData.followUpInstructions}`,
       <Sidebar />
       <div className='flex-1 overflow-auto p-6'>
         <div className="max-w-6xl mx-auto">
-          {/* Search Bar */}
-          <div className="mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search patients by name, MRN, or date of birth..."
-                value={state.searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors bg-white"
+
+          {/* Patient Info - Show search form when no patient selected, display card when patient selected */}
+          {!activePatient ? (
+            <PatientInfoCard 
+              patientName={patientName}
+              setPatientName={setPatientName}
+              patientDob={patientDob}
+              setPatientDob={setPatientDob}
+            />
+          ) : (
+            <PatientDisplayCard />
+          )}
+          
+          {/* Input Cards - Only show when a patient is selected */}
+          {activePatient && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <AudioRecordingCard 
+                audioStatus={audioStatus}
+                startRecording={startRecording}
+                stopRecording={stopRecording}
+                handleRecordingResults={handleRecordingResults}
+              />
+              
+              <TextFileUploadCard 
+                onFileUpload={handleTextFileUpload}
               />
             </div>
-          </div>
-
-          {/* Patient Info */}
-          <PatientInfoCard 
-            patientName={patientName}
-            setPatientName={setPatientName}
-            patientDob={patientDob}
-            setPatientDob={setPatientDob}
-          />
-          
-          {/* Input Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <AudioRecordingCard 
-              audioStatus={audioStatus}
-              startRecording={startRecording}
-              stopRecording={stopRecording}
-              handleRecordingResults={handleRecordingResults}
-            />
-            
-            <TextFileUploadCard 
-              onFileUpload={handleTextFileUpload}
-            />
-          </div>
+          )}
           
           {/* Results Area */}
           {displayResults && (
@@ -219,14 +213,17 @@ Follow-up: ${medicalData.followUpInstructions}`,
           {!displayResults && !isProcessing && !activePatient && (
             <div className="medical-card text-center py-12">
               <div className="text-gray-400 mb-4">
-                <Search className="h-16 w-16 mx-auto mb-4" />
+                <User className="h-16 w-16 mx-auto mb-4" />
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No Patient Selected
+                Welcome to Medical Dashboard
               </h3>
-              <p className="text-gray-500">
-                Select a patient from the sidebar or create a new patient to get started.
+              <p className="text-gray-500 mb-4">
+                Select an existing patient from the sidebar or enter patient information below to get started with medical documentation.
               </p>
+              <div className="text-sm text-gray-400">
+                Enter patient details to begin searching or creating patient records
+              </div>
             </div>)}
           </div>
       </div>

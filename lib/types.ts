@@ -47,6 +47,7 @@ export interface PatientState {
 export type PatientAction =
   | { type: 'SELECT_PATIENT'; payload: string }
   | { type: 'UPSERT_PATIENT'; payload: Patient }
+  | { type: 'LOAD_PATIENT'; payload: Patient }
   | { type: 'TOUCH_PATIENT'; payload: string }
   | { type: 'SET_SEARCH_QUERY'; payload: string }
   | { type: 'SET_PENDING_NEW_PATIENT'; payload: Partial<Patient> | null }

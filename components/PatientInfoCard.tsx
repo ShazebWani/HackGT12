@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { User, Search, Plus, X } from 'lucide-react'
 import { usePatient } from '../contexts/PatientContext'
 import { Patient } from '../lib/types'
@@ -16,7 +16,8 @@ const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDo
     selectPatient, 
     upsertPatient, 
     touchPatient, 
-    setPendingNewPatient 
+    setPendingNewPatient,
+    setSearchQuery 
   } = usePatient();
 
   const [firstName, setFirstName] = useState('')
@@ -24,6 +25,26 @@ const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDo
   const [mrn, setMrn] = useState('')
   const [dateOfBirth, setDateOfBirth] = useState('')
   const [showNewPatientModal, setShowNewPatientModal] = useState(false)
+
+  // Update search query as user types to filter sidebar
+  useEffect(() => {
+    const searchTerms = []
+    
+    if (firstName.trim()) searchTerms.push(firstName.trim())
+    if (lastName.trim()) searchTerms.push(lastName.trim())
+    if (mrn.trim()) searchTerms.push(mrn.trim())
+    if (dateOfBirth) searchTerms.push(dateOfBirth)
+    
+    const query = searchTerms.join(' ')
+    setSearchQuery(query)
+  }, [firstName, lastName, mrn, dateOfBirth, setSearchQuery])
+
+  // Clear search when component unmounts (when patient is selected)
+  useEffect(() => {
+    return () => {
+      setSearchQuery('')
+    }
+  }, [setSearchQuery])
 
   // Generate a new MRN
   const generateMRN = () => {
@@ -52,8 +73,8 @@ const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDo
     e.preventDefault();
     
     // Validate required fields
-    if (!firstName.trim() || !lastName.trim() || !dateOfBirth) {
-      alert('Please fill in all required fields (First Name, Last Name, Date of Birth)');
+    if (!firstName.trim() || !lastName.trim() || !dateOfBirth || !mrn.trim()) {
+      alert('Please fill in all required fields (First Name, Last Name, Date of Birth, MRN)');
       return;
     }
 
@@ -69,7 +90,7 @@ const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDo
       setPatientName(`${existingPatient.firstName} ${existingPatient.lastName}`);
       setPatientDob(existingPatient.dateOfBirth);
       
-      // Clear form
+      // Clear form and search query
       clearForm();
     } else {
       // Patient not found - set up for creation
@@ -77,7 +98,7 @@ const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDo
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         dateOfBirth,
-        mrn: mrn.trim() || generateMRN()
+        mrn: mrn.trim()
       });
       setShowNewPatientModal(true);
     }
@@ -89,7 +110,7 @@ const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDo
 
     const newPatient: Patient = {
       id: `patient-${Date.now()}`,
-      mrn: state.pendingNewPatient.mrn || generateMRN(),
+      mrn: state.pendingNewPatient.mrn!,
       firstName: state.pendingNewPatient.firstName!,
       lastName: state.pendingNewPatient.lastName!,
       dateOfBirth: state.pendingNewPatient.dateOfBirth!,
@@ -115,6 +136,7 @@ const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDo
     setLastName('');
     setMrn('');
     setDateOfBirth('');
+    setSearchQuery(''); // Clear sidebar filtering when form is cleared
   };
 
   // Cancel new patient creation
@@ -176,7 +198,7 @@ const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDo
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                MRN (Optional)
+                MRN *
               </label>
               <input
                 type="text"
@@ -184,6 +206,7 @@ const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDo
                 onChange={(e) => setMrn(e.target.value)}
                 placeholder="Enter MRN"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors"
+                required
               />
             </div>
           </div>

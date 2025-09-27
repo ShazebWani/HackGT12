@@ -16,7 +16,7 @@ function patientReducer(state: PatientState, action: PatientAction): PatientStat
     case 'SELECT_PATIENT':
       return {
         ...state,
-        activePatientId: action.payload,
+        activePatientId: action.payload || null, // Allow deselection with empty string
         pendingNewPatient: null, // Clear pending when selecting existing patient
       };
 
@@ -39,6 +39,27 @@ function patientReducer(state: PatientState, action: PatientAction): PatientStat
         patients: updatedPatients,
         activePatientId: patient.id,
         pendingNewPatient: null,
+      };
+    }
+
+    case 'LOAD_PATIENT': {
+      const patient = action.payload;
+      const existingIndex = state.patients.findIndex(p => p.id === patient.id);
+      
+      let updatedPatients;
+      if (existingIndex >= 0) {
+        // Update existing patient
+        updatedPatients = [...state.patients];
+        updatedPatients[existingIndex] = patient;
+      } else {
+        // Add new patient
+        updatedPatients = [patient, ...state.patients];
+      }
+
+      return {
+        ...state,
+        patients: updatedPatients,
+        // Don't set activePatientId when loading patients
       };
     }
 
@@ -142,7 +163,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const patients = loadPatientsFromStorage();
     patients.forEach(patient => {
-      dispatch({ type: 'UPSERT_PATIENT', payload: patient });
+      dispatch({ type: 'LOAD_PATIENT', payload: patient });
     });
   }, []);
 
