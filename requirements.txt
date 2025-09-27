@@ -6,4 +6,3 @@ assemblyai
 databases[sqlite]
 SQLAlchemy
 python-dotenv
-openai

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect, Request, HTTPException
+from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict
@@ -9,7 +9,6 @@ import assemblyai as aai
 import json
 from dotenv import load_dotenv
 from database import database, transcripts
-from agents.soap_agent import generate_soap_note
 
 # Load environment variables
 load_dotenv()
@@ -64,6 +63,21 @@ async def extract_entities_mock(transcription: str) -> dict:
         "lab_orders": ["throat culture"]
     }
 
+async def generate_soap_note_mock(entities: dict) -> str:
+    """Mock SOAP note generation function"""
+    return """SUBJECTIVE:
+34-year-old male presents with chief complaint of sore throat, fever, and swollen lymph nodes.
+
+OBJECTIVE:
+Physical examination reveals erythematous throat with tonsillar exudate. Palpable cervical lymphadenopathy noted. Rapid strep test positive.
+
+ASSESSMENT:
+Acute streptococcal pharyngitis (J02.0)
+
+PLAN:
+1. Prescribe Amoxicillin 500mg twice daily for 10 days
+2. Order follow-up throat culture
+3. Patient advised to return if symptoms worsen or persist"""
 
 # Billing code functions
 def load_billing_codes():
@@ -121,59 +135,46 @@ async def root():
     return {"message": "ScribeAgent AI Backend is running"}
 
 @app.post("/api/process-visit", response_model=ScribeAgentResponse)
-async def process_visit(request: Request):
+async def process_visit(file: UploadFile = File(...)):
     """
     Accept an audio file upload and return complete structured medical data
     """
-    try:
-        # Read the raw audio data from the request body
-        audio_bytes = await request.body()
-        print(f"📥 Received audio data: {len(audio_bytes)} bytes")
-        print(f"🔍 Audio data type: {type(audio_bytes)}")
-        print(f"📊 First 50 bytes: {audio_bytes[:50]}")
-        
-        if len(audio_bytes) == 0:
-            raise HTTPException(status_code=400, detail="No audio data received")
-        
-        # Step 1: Transcribe audio (mock for now, but could integrate with AssemblyAI)
-        transcription = await transcribe_audio_mock(audio_bytes)
-        print(f"📝 Transcription: {transcription[:100]}...")
-        
-        # Step 2: Extract entities from transcription (mock)
-        entities = await extract_entities_mock(transcription)
-        
-        # Step 3: Generate SOAP note using the new Mastra agent
-        soap_note = await generate_soap_note(transcription)
-        
-        # Step 4: Get billing code using real lookup function
-        billing_code = get_billing_code(entities["diagnosis"])
-        
-        # Step 5: Create prescriptions from extracted entities
-        prescriptions = [
-            Prescription(
-                medication=entities["medication"],
-                dosage=entities["dosage"],
-                frequency=entities["frequency"],
-                duration=entities["duration"]
-            )
-        ]
-        
-        # Step 6: Assemble final response
-        response = ScribeAgentResponse(
-            transcription=transcription,
-            soap_note=soap_note,
-            diagnosis=entities["diagnosis"],
-            billing_code=billing_code,
-            prescriptions=prescriptions,
-            lab_orders=entities["lab_orders"]
+    # Read the audio file content
+    audio_bytes = await file.read()
+    
+    # Step 1: Transcribe audio (mock)
+    transcription = await transcribe_audio_mock(audio_bytes)
+    
+    # Step 2: Extract entities from transcription (mock)
+    entities = await extract_entities_mock(transcription)
+    
+    # Step 3: Generate SOAP note from entities (mock)
+    soap_note = await generate_soap_note_mock(entities)
+    
+    # Step 4: Get billing code using real lookup function
+    billing_code = get_billing_code(entities["diagnosis"])
+    
+    # Step 5: Create prescriptions from extracted entities
+    prescriptions = [
+        Prescription(
+            medication=entities["medication"],
+            dosage=entities["dosage"],
+            frequency=entities["frequency"],
+            duration=entities["duration"]
         )
-        
-        print("✅ Processing complete, returning response")
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error processing audio: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing audio: {str(e)}")
+    ]
+    
+    # Step 6: Assemble final response
+    response = ScribeAgentResponse(
+        transcription=transcription,
+        soap_note=soap_note,
+        diagnosis=entities["diagnosis"],
+        billing_code=billing_code,
+        prescriptions=prescriptions,
+        lab_orders=entities["lab_orders"]
+    )
+    
+    return response
 
 async def save_transcript_to_db(text: str):
     """Save transcript to database"""
@@ -190,8 +191,8 @@ async def run_final_processing(transcript: str) -> dict:
         # Step 1: Extract entities from the final transcript
         entities = await extract_entities_mock(transcript)
         
-        # Step 2: Generate SOAP note using the new Mastra agent
-        soap_note = await generate_soap_note(transcript)
+        # Step 2: Generate SOAP note from entities
+        soap_note = await generate_soap_note_mock(entities)
         
         # Step 3: Get billing code using real lookup function
         billing_code = get_billing_code(entities["diagnosis"])
@@ -227,46 +228,88 @@ async def websocket_process_visit(websocket: WebSocket):
     WebSocket endpoint for real-time audio streaming and transcription
     """
     await websocket.accept()
-    print("✅ WebSocket connection established")
+    print("WebSocket connection established")
     
     # Storage for the complete final transcript
     final_transcript = ""
-    audio_chunks_received = 0
+    
+    async def handle_partial_transcript_local(data):
+        """Handle partial transcript data from AssemblyAI"""
+        nonlocal final_transcript
+        try:
+            if data.text:
+                final_transcript = data.text
+                # Send partial transcript to client
+                await websocket.send_json({
+                    "type": "partial_transcript",
+                    "text": data.text,
+                    "is_final": data.is_final
+                })
+                print(f"Partial transcript: {data.text}")
+        except Exception as e:
+            print(f"Error handling partial transcript: {e}")
+
+    async def handle_error_local(error):
+        """Handle errors from AssemblyAI"""
+        try:
+            print(f"AssemblyAI error: {error}")
+            await websocket.send_json({
+                "type": "error",
+                "message": f"Transcription error: {str(error)}"
+            })
+        except Exception as e:
+            print(f"Error handling AssemblyAI error: {e}")
+
+    async def handle_close_local():
+        """Handle AssemblyAI stream close"""
+        try:
+            print(f"AssemblyAI stream closed. Final transcript: {final_transcript}")
+            
+            if final_transcript:
+                # Save transcript to database
+                await save_transcript_to_db(final_transcript)
+                
+                # Run final processing
+                result = await run_final_processing(final_transcript)
+                
+                # Send final result to client
+                await websocket.send_json({
+                    "type": "final_result",
+                    "data": result
+                })
+        except Exception as e:
+            print(f"Error in handle_close: {e}")
+            await websocket.send_json({
+                "type": "error",
+                "message": f"Error processing final transcript: {str(e)}"
+            })
     
     try:
-        # Send initial connection confirmation
-        await websocket.send_json({
-            "type": "connection_established",
-            "message": "WebSocket connected successfully"
-        })
+        # Create AssemblyAI streaming client
+        client = aai.RealtimeTranscriber(
+            sample_rate=16000,
+            on_data=lambda data: asyncio.create_task(handle_partial_transcript_local(data)),
+            on_error=lambda error: asyncio.create_task(handle_error_local(error)),
+            on_close=lambda: asyncio.create_task(handle_close_local())
+        )
         
-        # Simple audio handling without AssemblyAI for now
+        # Connect to AssemblyAI
+        client.connect()
+        
         async def handle_audio_stream():
-            """Handle incoming audio from client"""
-            nonlocal final_transcript, audio_chunks_received
+            """Handle incoming audio from client and send to AssemblyAI"""
             try:
                 while True:
                     # Receive audio data from client
                     data = await websocket.receive_bytes()
-                    audio_chunks_received += 1
-                    print(f"📥 Received audio chunk #{audio_chunks_received}: {len(data)} bytes")
-                    
-                    # For now, just acknowledge receipt
-                    if audio_chunks_received % 10 == 0:  # Every 10 chunks
-                        await websocket.send_json({
-                            "type": "partial_transcript",
-                            "text": f"Received {audio_chunks_received} audio chunks...",
-                            "is_final": False
-                        })
-                        
+                    # Send to AssemblyAI streaming client
+                    client.stream(data)
             except WebSocketDisconnect:
-                print("🔌 Client disconnected during audio streaming")
+                print("Client disconnected during audio streaming")
+                client.close()
             except Exception as e:
-                print(f"❌ Error in audio streaming: {e}")
-                await websocket.send_json({
-                    "type": "error",
-                    "message": f"Audio processing error: {str(e)}"
-                })
+                print(f"Error in audio streaming: {e}")
+                client.close()
         
         # Start audio handling task
         audio_task = asyncio.create_task(handle_audio_stream())
@@ -274,39 +317,10 @@ async def websocket_process_visit(websocket: WebSocket):
         # Wait for the audio task to complete
         await audio_task
         
-        # Simulate final processing after a delay
-        if audio_chunks_received > 0:
-            print(f"🎯 Processing {audio_chunks_received} audio chunks...")
-            
-            # Simulate processing time
-            await asyncio.sleep(2)
-            
-            # Create a mock final transcript
-            final_transcript = "Patient is a 34-year-old male presenting with sore throat symptoms. This is a test transcription from the WebSocket connection."
-            
-            # Save to database
-            await save_transcript_to_db(final_transcript)
-            
-            # Run final processing
-            result = await run_final_processing(final_transcript)
-            
-            # Send final result
-            await websocket.send_json({
-                "type": "final_result",
-                "data": result
-            })
-        
     except WebSocketDisconnect:
-        print("🔌 WebSocket disconnected")
+        print("WebSocket disconnected")
     except Exception as e:
-        print(f"❌ WebSocket error: {e}")
-        try:
-            await websocket.send_json({
-                "type": "error",
-                "message": f"WebSocket error: {str(e)}"
-            })
-        except:
-            pass
+        print(f"WebSocket error: {e}")
     finally:
-        print("🏁 Client disconnected")
+        print("Client disconnected")
 
