@@ -36,7 +36,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen min-h-screen bg-base">
+    <div className="flex h-screen min-h-screen bg-base overflow-clip">
       <Sidebar />
       <div className='flex-1 overflow-auto p-6'>
         <div className="max-w-6xl mx-auto">
