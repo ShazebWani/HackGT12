@@ -3,11 +3,10 @@ import sys
 import time
 from openai import OpenAI
 from dotenv import load_dotenv
-import msvcrt  # For detecting Esc key on Windows console
 import threading
 from typing import Callable, Optional
 
-import speech_recognition as sr  # The main library for microphone capture
+import speech_recognition as sr  
 import tempfile
 import soundfile as sf
 import numpy as np

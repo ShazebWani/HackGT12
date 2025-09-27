@@ -8,3 +8,6 @@ sounddevice
 soundfile
 numpy
 openai
+
+keyboard
+SpeechRecognition

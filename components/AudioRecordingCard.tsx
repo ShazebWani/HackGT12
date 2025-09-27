@@ -12,11 +12,80 @@ interface AudioRecordingProps {
 const AudioRecordingCard = ({ audioStatus, startRecording, stopRecording, handleRecordingResults }: AudioRecordingProps) => {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const wsRef = useRef<WebSocket | null>(null)
+  const [audioResults, setAudioResults] = useState<any>(null)
+
+  function getWsUrl() {
+    if (typeof window === 'undefined') return 'ws://localhost:8000/ws/transcription'
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+    return `${protocol}://${window.location.hostname}:8000/ws/transcription`
+  }
+
+  // We use MediaRecorder to capture audio chunks in modern browsers.
+
+  async function start() {
+    setIsProcessing(false)
+    startRecording()
+
+    const ws = new WebSocket(getWsUrl())
+    ws.onopen = () => console.log('WS open')
+
+    ws.onmessage = (ev) => {
+
+      try {
+        const data = JSON.parse(ev.data as string)
+        console.log('WS msg', data)
+
+        if (data.type === "final_result") {
+          setAudioResults?.({ transcription: data.data.transcription, isFinal: true })
+          ws.close()  // close here, not earlier
+          setIsProcessing(false)
+        }
+
+        if (data.type === 'stopped') {
+          console.log('Transcription stopped by backend')
+          setIsProcessing(false)
+        }
+      } catch (e) {
+        console.warn('WS message parse error', e)
+      }
+    }
+
+    ws.onclose = () => console.log('WS closed')
+    ws.onerror = (e) => console.error('WS error', e)
+
+    wsRef.current = ws
+  }
+
+  function stopAll() {
+    // Tell backend to stop capturing
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        wsRef.current.send(JSON.stringify({ type: 'END_OF_STREAM' }))
+        // ONLY set isProcessing to true here, we wait for final_result to set it to false
+        setIsProcessing(true)
+      } catch (e) {
+        console.error('Failed to send END_OF_STREAM', e)
+        // If we fail to send, we should still stop recording and clear processing
+        stopRecording()
+        setIsProcessing(false)
+      }
+    } else {
+      // If WebSocket wasn't open, just stop recording and clear state
+      stopRecording()
+      setIsProcessing(false)
+    }
+
+    // Update UI: stopRecording is called regardless
+    stopRecording()
+  }
+
 
   const handleRecordClick = useCallback(() => {
     if (audioStatus === 'idle') {
       startRecording()
       setIsProcessing(false)
+      start().catch(console.error)
     } else {
       // On stop, simulate processing then set results
       stopRecording()
@@ -74,6 +143,7 @@ PLAN:
         
         setIsProcessing(false)
         handleRecordingResults(mockResults)
+        stopAll()
       }, 2200) // 2.2s processing simulation
     }
   }, [audioStatus, startRecording, stopRecording, handleRecordingResults])
@@ -89,6 +159,7 @@ PLAN:
         <div className="mb-4">
           <p className="text-gray-600 mb-2">Record patient consultation</p>
           <p className="text-sm text-gray-500">Click to start/stop recording</p>
+          <p className="text-sm text-gray-500">Results: {audioResults?.transcription}</p>
         </div>
         
         {/* Recording Controls */}
