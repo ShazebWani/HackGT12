@@ -1,6 +1,39 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  /* Base theme colors */
+  --color-base: #f1f9ff;
+  --color-elevated:	#ccecee;
+  
+  /* Accent colors */
+  --color-accent-1: #095d7e;
+  --color-accent-2: #14967f;
+  --color-accent-3: #e2fcd6;
+  
+  /* Medical color palette */
+  --color-medical-50: #f0fdfa;
+  --color-medical-100: #ccfbf1;
+  --color-medical-200: #99f6e4;
+  --color-medical-300: #5eead4;
+  --color-medical-400: #2dd4bf;
+  --color-medical-500: #14b8a6;
+  --color-medical-600: #0d9488;
+  --color-medical-700: #0f766e;
+  --color-medical-800: #115e59;
+  --color-medical-900: #134e4a;
+  
+  /* Primary color palette */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+}
 
 @layer base {
   html {
@@ -10,7 +43,7 @@
 
 @layer components {
   .medical-card {
-    @apply bg-white rounded-lg shadow-lg border border-gray-200 p-6;
+    @apply bg-base rounded-lg border-2 border-accent-1/25 p-6;
   }
   
   .medical-button {
