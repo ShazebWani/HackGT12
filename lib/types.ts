@@ -26,6 +26,17 @@ export interface ScribeAgentResponse {
 }
 
 // Patient Dashboard Types
+export interface MedicalRecord {
+  id: string;
+  date: string; // ISO timestamp
+  transcription: string;
+  soap_note: string;
+  diagnosis: string;
+  billing_code: BillingCode;
+  prescriptions: Prescription[];
+  lab_orders: string[];
+}
+
 export interface Patient {
   id: string;
   mrn: string;
@@ -33,6 +44,7 @@ export interface Patient {
   lastName: string;
   dateOfBirth: string; // YYYY-MM-DD format
   lastUpdated: string; // ISO timestamp
+  medicalRecords?: MedicalRecord[]; // Array of medical records
   // Embed the existing ScribeAgentResponse data
   medicalData?: ScribeAgentResponse;
 }
@@ -51,3 +63,4 @@ export type PatientAction =
   | { type: 'TOUCH_PATIENT'; payload: string }
   | { type: 'SET_SEARCH_QUERY'; payload: string }
   | { type: 'SET_PENDING_NEW_PATIENT'; payload: Partial<Patient> | null }
+  | { type: 'ADD_MEDICAL_RECORD'; payload: { patientId: string; record: MedicalRecord } }
