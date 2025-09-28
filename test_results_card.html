@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Results Card</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .medical-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .bg-purple-50 { background-color: #faf5ff; }
+        .bg-orange-50 { background-color: #fff7ed; }
+        .border-purple-200 { border-color: #e9d5ff; }
+        .border-orange-200 { border-color: #fed7aa; }
+        .text-purple-900 { color: #581c87; }
+        .text-orange-900 { color: #9a3412; }
+        .text-purple-600 { color: #9333ea; }
+        .text-orange-600 { color: #ea580c; }
+        .text-purple-700 { color: #7c3aed; }
+        .text-orange-800 { color: #9a3412; }
+        .text-purple-800 { color: #6b21a8; }
+        .bg-white { background-color: white; }
+        .rounded-lg { border-radius: 8px; }
+        .p-4 { padding: 16px; }
+        .p-6 { padding: 24px; }
+        .px-4 { padding-left: 16px; padding-right: 16px; }
+        .py-3 { padding-top: 12px; padding-bottom: 12px; }
+        .mb-4 { margin-bottom: 16px; }
+        .mb-6 { margin-bottom: 24px; }
+        .space-y-3 > * + * { margin-top: 12px; }
+        .space-y-2 > * + * { margin-top: 8px; }
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .space-x-2 > * + * { margin-left: 8px; }
+        .justify-between { justify-content: space-between; }
+        .font-semibold { font-weight: 600; }
+        .text-lg { font-size: 18px; }
+        .text-sm { font-size: 14px; }
+        .capitalize { text-transform: capitalize; }
+        .shadow-sm { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); }
+        .border { border-width: 1px; border-style: solid; }
+        .bg-yellow-100 { background-color: #fef3c7; }
+        .border-yellow-300 { border-color: #fcd34d; }
+        .text-sm { font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Mock data that should come from the backend
+        const testData = {
+            transcription: "Patient is a 45-year-old male here for a follow-up on his hypertension. He says he's been taking his lisinopril daily and has been checking his blood pressure, which is running about 130 over 80. No complaints of dizziness or side effects. Exam shows a BP of 128/82 and a heart rate of 70. Lungs are clear. We'll continue the current dose of lisinopril 10mg and see him back in 3 months.",
+            soap_note: "SUBJECTIVE:\n He says he's been taking his lisinopril daily and has been checking his blood pressure, which is running about 130 over 80\n\nOBJECTIVE:\nPhysical Exam: Lungs clear to auscultation.\n\nASSESSMENT:\nHypertension\n\nPLAN:\n- Follow up as needed\n- Return if symptoms worsen",
+            diagnosis: "Hypertension",
+            billing_code: {
+                code: "I10",
+                description: "Essential hypertension"
+            },
+            prescriptions: [
+                {
+                    medication: "lisinopril",
+                    dosage: "10mg",
+                    frequency: "daily",
+                    duration: "3 months"
+                }
+            ],
+            lab_orders: ["CBC", "CMP", "Lipid panel"]
+        };
+
+        function ResultsCard({ results }) {
+            if (!results) {
+                return null;
+            }
+
+            // Debug logging
+            console.log("🔍 ResultsCard received data:", results);
+            console.log("🔍 Prescriptions data:", results.prescriptions);
+            console.log("🔍 Lab orders data:", results.lab_orders);
+            console.log("🔍 Prescriptions length:", results.prescriptions?.length);
+            console.log("🔍 Lab orders length:", results.lab_orders?.length);
+
+            return (
+                <div className="medical-card w-full">
+                    {/* Header */}
+                    <div className="flex items-center gap-2 mb-6">
+                        <h3 className="text-lg font-semibold">Medical Documentation</h3>
+                    </div>
+
+                    {/* Prescriptions */}
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+                        <div className="flex items-center space-x-2 mb-4">
+                            <h4 className="text-lg font-semibold text-purple-900">Prescriptions</h4>
+                        </div>
+                        
+                        {/* Debug information */}
+                        <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded text-sm">
+                            <strong>Debug Info:</strong><br/>
+                            Prescriptions exists: {results.prescriptions ? 'Yes' : 'No'}<br/>
+                            Prescriptions type: {typeof results.prescriptions}<br/>
+                            Prescriptions length: {results.prescriptions?.length || 'N/A'}<br/>
+                            Prescriptions content: {JSON.stringify(results.prescriptions)}
+                        </div>
+                        
+                        <div className="space-y-3">
+                            {results.prescriptions && results.prescriptions.length > 0 ? (
+                                results.prescriptions.map((prescription, index) => (
+                                    <div
+                                        key={index}
+                                        className="bg-white rounded-lg p-4 border border-purple-200 shadow-sm"
+                                    >
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="font-semibold text-purple-900 text-lg">{prescription.medication || 'Not specified'}</span>
+                                            <span className="text-purple-600 font-medium">{prescription.dosage || 'Not specified'}</span>
+                                        </div>
+                                        <p className="text-purple-700">
+                                            {prescription.frequency || 'Not specified'} for {prescription.duration || 'Not specified'}
+                                        </p>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="bg-white rounded-lg p-4 border border-purple-200 shadow-sm">
+                                    <span className="text-purple-800 font-medium">Not specified</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Lab Orders */}
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
+                        <div className="flex items-center space-x-2 mb-4">
+                            <h4 className="text-lg font-semibold text-orange-900">Lab Orders</h4>
+                        </div>
+                        
+                        {/* Debug information */}
+                        <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded text-sm">
+                            <strong>Debug Info:</strong><br/>
+                            Lab orders exists: {results.lab_orders ? 'Yes' : 'No'}<br/>
+                            Lab orders type: {typeof results.lab_orders}<br/>
+                            Lab orders length: {results.lab_orders?.length || 'N/A'}<br/>
+                            Lab orders content: {JSON.stringify(results.lab_orders)}
+                        </div>
+                        
+                        <div className="space-y-2">
+                            {results.lab_orders && results.lab_orders.length > 0 ? (
+                                results.lab_orders.map((order, index) => (
+                                    <div
+                                        key={index}
+                                        className="bg-white rounded-lg px-4 py-3 border border-orange-200 shadow-sm"
+                                    >
+                                        <span className="text-orange-800 capitalize font-medium">{order || 'Not specified'}</span>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="bg-white rounded-lg px-4 py-3 border border-orange-200 shadow-sm">
+                                    <span className="text-orange-800 font-medium">Not specified</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            return (
+                <div>
+                    <h1>Test Results Card</h1>
+                    <ResultsCard results={testData} />
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

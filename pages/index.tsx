@@ -34,45 +34,34 @@ export default function Home() {
   }
 
   const handleRecordingResults = useCallback((recordingResults: any) => {
-    console.log("🎤 Recording results received:", recordingResults);
-
     if (!recordingResults) {
-      console.log("❌ No recording results provided");
       return;
     }
+
+    console.log("🔍 handleRecordingResults received:", recordingResults);
+    console.log("🔍 Has transcription:", !!recordingResults.transcription);
+    console.log("🔍 Has soap_note:", !!recordingResults.soap_note);
+    console.log("🔍 Has prescriptions:", !!recordingResults.prescriptions);
+    console.log("🔍 Has lab_orders:", !!recordingResults.lab_orders);
 
     // Check if we have structured medical data from SOAP agent
     if (recordingResults.transcription && recordingResults.soap_note) {
       // Full structured medical data - set as results for display
-      console.log("✅ Setting SOAP agent results:", recordingResults);
-      console.log("📊 Data structure check:", {
-        hasTranscription: !!recordingResults.transcription,
-        hasSoapNote: !!recordingResults.soap_note,
-        hasDiagnosis: !!recordingResults.diagnosis,
-        hasBillingCode: !!recordingResults.billing_code,
-        prescriptionsCount: recordingResults.prescriptions?.length || 0
-      });
-      
+      console.log("✅ Setting full structured medical data as results");
       setResults(recordingResults);
       setIsProcessing(false);
-      
-      console.log("🔄 Results state should now be updated");
     } else if (recordingResults.transcription) {
       // Just transcription (fallback)
-      console.log("⚠️ Only transcription received, no SOAP data");
+      console.log("⚠️ Only transcription available, using fallback");
       const text = recordingResults.transcription;
       setIsAudio(text);
       setIsProcessing(!recordingResults.isFinal);
-    } else {
-      console.log("❌ No valid data received from recording");
     }
   }, []);
 
   // Track results state changes
   useEffect(() => {
-    console.log("🔄 Results state changed:", results);
     if (results) {
-      console.log("✅ Results are now available for display");
       // Small delay to ensure the results section is rendered
       setTimeout(() => {
         const resultsSection = document.getElementById('results-section')
@@ -83,8 +72,6 @@ export default function Home() {
           })
         }
       }, 100)
-    } else {
-      console.log("❌ No results available");
     }
   }, [results])
 
@@ -99,33 +86,27 @@ export default function Home() {
   }
 
   const handleTextFileUpload = (file: File) => {
-    console.log('Text file uploaded:', file.name)
     // Here you could read the file content and process it
   }
 
-  // Test function to manually set results
-  const testSetResults = () => {
-    const testData = {
-      transcription: "Test transcription from manual button",
-      soap_note: "SUBJECTIVE:\nTest patient with test symptoms.\n\nOBJECTIVE:\nTest findings.\n\nASSESSMENT:\nTest diagnosis.\n\nPLAN:\nTest treatment plan.",
-      diagnosis: "Test Diagnosis",
-      billing_code: { code: "Z00.00", description: "Test billing code" },
-      prescriptions: [{ medication: "Test Med", dosage: "100mg", frequency: "twice daily", duration: "7 days" }],
-      lab_orders: ["Test Lab Order"]
-    };
-    console.log("🧪 Setting test results manually:", testData);
-    setResults(testData);
-  }
+  const handleTextContextProcessed = useCallback((results: any) => {
+    if (!results) {
+      return;
+    }
+
+    // Check if we have structured medical data from SOAP agent
+    if (results.transcription && results.soap_note) {
+      // Full structured medical data - set as results for display
+      setResults(results);
+      setIsProcessing(false);
+    }
+  }, []);
+
 
 
   // Only show results from SOAP agent, not patient mock data
   const displayResults = results;
   
-  // Debug logging
-  console.log("🔍 Debug - results state:", results);
-  console.log("🔍 Debug - displayResults:", displayResults);
-  console.log("🔍 Debug - isProcessing:", isProcessing);
-  console.log("🔍 Debug - activePatient:", activePatient);
 
   // Enforce auth/redirect based on role
   useEffect(() => {
@@ -215,6 +196,7 @@ export default function Home() {
                     
                     <TextFileUploadCard 
                       onFileUpload={handleTextFileUpload}
+                      onTextContextProcessed={handleTextContextProcessed}
                     />
                   </div>
                 </div>

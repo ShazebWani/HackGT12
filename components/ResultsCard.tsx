@@ -24,21 +24,16 @@ interface ResultsCardPropsExtended extends ResultsCardProps {
 }
 
 export default function ResultsCard({ results }: ResultsCardPropsExtended) {
-  console.log("🔍 ResultsCard received data:", results);
-  
   if (!results) {
-    console.log("❌ ResultsCard: No results data provided");
     return null;
   }
-  
-  console.log("✅ ResultsCard: Rendering with data:", {
-    hasTranscription: !!results.transcription,
-    hasSoapNote: !!results.soap_note,
-    hasDiagnosis: !!results.diagnosis,
-    hasBillingCode: !!results.billing_code,
-    prescriptionsCount: results.prescriptions?.length || 0,
-    labOrdersCount: results.lab_orders?.length || 0
-  });
+
+  // Debug logging to see what data we're receiving
+  console.log("🔍 ResultsCard received data:", results);
+  console.log("🔍 Prescriptions data:", results.prescriptions);
+  console.log("🔍 Lab orders data:", results.lab_orders);
+  console.log("🔍 Prescriptions length:", results.prescriptions?.length);
+  console.log("🔍 Lab orders length:", results.lab_orders?.length);
 
   return (
     <div className="medical-card w-full">
@@ -96,6 +91,16 @@ export default function ResultsCard({ results }: ResultsCardPropsExtended) {
             <Pill className="h-6 w-6 text-purple-600" />
             <h4 className="text-lg font-semibold text-purple-900">Prescriptions</h4>
           </div>
+          
+          {/* Debug information */}
+          <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded text-sm">
+            <strong>Debug Info:</strong><br/>
+            Prescriptions exists: {results.prescriptions ? 'Yes' : 'No'}<br/>
+            Prescriptions type: {typeof results.prescriptions}<br/>
+            Prescriptions length: {results.prescriptions?.length || 'N/A'}<br/>
+            Prescriptions content: {JSON.stringify(results.prescriptions)}
+          </div>
+          
           <div className="space-y-3">
             {results.prescriptions && results.prescriptions.length > 0 ? (
               results.prescriptions.map((prescription, index) => (
@@ -126,6 +131,16 @@ export default function ResultsCard({ results }: ResultsCardPropsExtended) {
             <TestTube className="h-6 w-6 text-orange-600" />
             <h4 className="text-lg font-semibold text-orange-900">Lab Orders</h4>
           </div>
+          
+          {/* Debug information */}
+          <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded text-sm">
+            <strong>Debug Info:</strong><br/>
+            Lab orders exists: {results.lab_orders ? 'Yes' : 'No'}<br/>
+            Lab orders type: {typeof results.lab_orders}<br/>
+            Lab orders length: {results.lab_orders?.length || 'N/A'}<br/>
+            Lab orders content: {JSON.stringify(results.lab_orders)}
+          </div>
+          
           <div className="space-y-2">
             {results.lab_orders && results.lab_orders.length > 0 ? (
               results.lab_orders.map((order, index) => (

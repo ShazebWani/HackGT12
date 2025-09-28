@@ -126,53 +126,8 @@ const AudioRecordingCard = ({ audioStatus, startRecording, stopRecording, handle
       
       if (timerRef.current) clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => {
-        // TODO: Backend team - replace this with real Whisper API call
-        // For now, using mock data that matches ResultsDisplay interface
-        const mockResults = {
-          transcription: "Patient is a 34-year-old male presenting with sore throat, fever, and swollen lymph nodes. Rapid strep test was positive. Diagnosis is acute streptococcal pharyngitis. I'm prescribing Amoxicillin 500mg, twice daily for 10 days, and ordering a follow-up throat culture.",
-          soap_note: `SUBJECTIVE:
-34-year-old male presents with chief complaint of sore throat for 3 days. Patient reports associated fever (101.2°F), difficulty swallowing, and tender swollen lymph nodes in neck. Denies cough, runny nose, or body aches. No known sick contacts.
-
-OBJECTIVE:
-Vital Signs: T 101.2°F, BP 128/78, HR 88, RR 16, O2 Sat 98%
-Physical Exam:
-- HEENT: Erythematous throat with tonsillar exudate, tender anterior cervical lymphadenopathy
-- Lungs: Clear to auscultation bilaterally
-- Heart: Regular rate and rhythm
-
-ASSESSMENT:
-Acute streptococcal pharyngitis (strep throat)
-Rapid strep test: Positive
-
-PLAN:
-1. Antibiotic therapy: Amoxicillin 500mg PO BID x 10 days
-2. Supportive care: Rest, fluids, throat lozenges
-3. Follow-up throat culture in 48-72 hours
-4. Return if symptoms worsen or no improvement in 3-4 days`,
-          diagnosis: "acute streptococcal pharyngitis",
-          billing_code: {
-            code: "J02.0",
-            description: "Streptococcal pharyngitis"
-          },
-          prescriptions: [
-            {
-              medication: "Amoxicillin",
-              dosage: "500mg",
-              frequency: "Twice daily",
-              duration: "10 days"
-            },
-            {
-              medication: "Throat Lozenges",
-              dosage: "As needed",
-              frequency: "Every 2-4 hours",
-              duration: "Until symptoms resolve"
-            }
-          ],
-          lab_orders: [
-            "throat culture",
-            "complete blood count with differential"
-          ]
-        }
+        // TODO: Replace with actual API call to backend for real transcription and SOAP generation
+        console.log("⚠️ Mock processing - replace with real API call to backend");
         
         setIsProcessing(false)
         stopAll()

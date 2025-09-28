@@ -6,7 +6,7 @@ export default function StaticTest() {
         <pre>This is a static test page. The API call should work from the browser console.</pre>
         <p className="mt-2">Open browser console and run:</p>
         <code className="block mt-2 p-2 bg-gray-200 rounded">
-          fetch('http://localhost:8000/api/patients').then(r => r.json()).then(console.log)
+          {`fetch('http://localhost:8000/api/patients').then(r => r.json()).then(console.log)`}
         </code>
       </div>
     </div>

@@ -2,12 +2,12 @@
 
 ## Overview
 
-This is the real-time streaming backend for ScribeAgent AI, built with FastAPI and AssemblyAI. It provides live speech-to-text transcription via WebSocket connections and processes the results through downstream AI analysis.
+This is the real-time streaming backend for ScribeAgent AI, built with FastAPI and OpenAI Whisper. It provides live speech-to-text transcription via WebSocket connections and processes the results through downstream AI analysis.
 
 ## Features
 
 - **Real-time Audio Streaming**: WebSocket endpoint accepts live audio streams
-- **Live Transcription**: Uses AssemblyAI's real-time API for speech-to-text
+- **Live Transcription**: Uses OpenAI Whisper API for speech-to-text
 - **Database Persistence**: Saves final transcripts to SQLite database
 - **AI Processing**: Extracts entities, generates SOAP notes, and looks up billing codes
 - **Secure Configuration**: API keys stored in environment variables
@@ -130,8 +130,8 @@ Frontend (WebSocket Client)
     ↓ (audio stream)
 WebSocket Endpoint (/ws/process-visit)
     ↓ (audio data)
-AssemblyAI RealtimeTranscriber
-    ↓ (partial transcripts)
+OpenAI Whisper API
+    ↓ (transcript)
 WebSocket Endpoint
     ↓ (final transcript)
 Database (SQLite)
@@ -148,10 +148,11 @@ WebSocket Client
 - `OPENAI_API_KEY`: Your OpenAI API key (required for SOAP note generation)
 - `DATABASE_URL`: SQLite database URL (default: `sqlite:///./transcripts.db`)
 
-### AssemblyAI Configuration
+### OpenAI Whisper Configuration
 
-- Sample Rate: 16000 Hz
-- Real-time streaming enabled
+- Model: gpt-4o-transcribe
+- Language: English (forced)
+- Real-time processing enabled
 - Automatic punctuation and formatting
 
 ## Error Handling
@@ -159,7 +160,7 @@ WebSocket Client
 The WebSocket endpoint includes comprehensive error handling:
 
 - **Connection Errors**: Graceful WebSocket disconnection handling
-- **AssemblyAI Errors**: Transcription service error propagation
+- **OpenAI Whisper Errors**: Transcription service error propagation
 - **Database Errors**: Transaction rollback and error logging
 - **Processing Errors**: Downstream AI processing error handling
 
@@ -204,13 +205,13 @@ uvicorn main:app --reload --log-level debug
 - **Concurrent Connections**: FastAPI supports multiple WebSocket connections
 - **Memory Usage**: Audio data is streamed, not buffered
 - **Database**: SQLite suitable for development; consider PostgreSQL for production
-- **AssemblyAI**: Check rate limits and pricing for production usage
+- **OpenAI Whisper**: Check rate limits and pricing for production usage
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **"AssemblyAI API key not set"**
+1. **"OpenAI API key not set"**
    - Check your `.env` file
    - Ensure `OPENAI_API_KEY` is set correctly
 
@@ -224,7 +225,7 @@ uvicorn main:app --reload --log-level debug
 
 4. **Audio not transcribing**
    - Ensure audio is in correct format (16kHz sample rate)
-   - Check AssemblyAI API key and quota
+   - Check OpenAI API key and quota
 
 ### Logs
 

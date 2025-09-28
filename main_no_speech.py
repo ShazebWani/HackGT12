@@ -73,21 +73,14 @@ class PatientResponse(BaseModel):
 class TextInput(BaseModel):
     text: str
 
-# Mock AI functions
+# TODO: Replace with real AI functions
 async def transcribe_audio_mock(audio_bytes: bytes) -> str:
-    """Mock transcription function"""
-    return "Patient is a 34-year-old male presenting with a sore throat, fever, and swollen lymph nodes. Rapid strep test was positive. Diagnosis is acute streptococcal pharyngitis. I'm prescribing Amoxicillin 500mg, twice daily for 10 days, and ordering a follow-up throat culture."
+    """TODO: Replace with real transcription function using OpenAI Whisper or similar"""
+    raise NotImplementedError("Replace with real transcription implementation")
 
 async def extract_entities_mock(transcription: str) -> dict:
-    """Mock entity extraction function"""
-    return {
-        "diagnosis": "streptococcal pharyngitis",
-        "medication": "Amoxicillin",
-        "dosage": "500mg",
-        "frequency": "twice daily",
-        "duration": "10 days",
-        "lab_orders": ["throat culture"]
-    }
+    """TODO: Replace with real entity extraction function using LLM"""
+    raise NotImplementedError("Replace with real entity extraction implementation")
 
 # Billing code functions
 def load_billing_codes():

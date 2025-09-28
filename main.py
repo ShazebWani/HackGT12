@@ -12,6 +12,9 @@ from datetime import datetime
 from dotenv import load_dotenv
 from database import database, transcripts, patients
 from agents.mastra_soap_agent import generate_soap_note
+import pdfplumber
+import PyPDF2
+import io
 
 # Load environment variables
 load_dotenv()
@@ -63,6 +66,10 @@ class PatientUpdate(BaseModel):
     date_of_birth: Optional[str] = None
     medical_data: Optional[dict] = None
 
+class TextContextRequest(BaseModel):
+    text: str
+    context_type: Optional[str] = "general"  # "general", "medical_notes", "patient_history", etc.
+
 class PatientResponse(BaseModel):
     id: str
     mrn: str
@@ -72,21 +79,143 @@ class PatientResponse(BaseModel):
     last_updated: str
     medical_data: Optional[dict] = None
 
-# Mock AI functions
-async def transcribe_audio_mock(audio_bytes: bytes) -> str:
-    """Mock transcription function"""
-    return "Patient is a 34-year-old male presenting with a sore throat, fever, and swollen lymph nodes. Rapid strep test was positive. Diagnosis is acute streptococcal pharyngitis. I'm prescribing Amoxicillin 500mg, twice daily for 10 days, and ordering a follow-up throat culture."
+async def transcribe_audio(audio_bytes: bytes) -> str:
+    """Transcribe audio using OpenAI Whisper API"""
+    try:
+        import openai
+        from openai import OpenAI
+        
+        # Initialize OpenAI client
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        
+        # Create a temporary file for the audio
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
+            tmp_file.write(audio_bytes)
+            tmp_file_path = tmp_file.name
+        
+        try:
+            # Transcribe using OpenAI Whisper
+            with open(tmp_file_path, "rb") as audio_file:
+                transcription = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    language="en"  # Force English for medical context
+                )
+            
+            return transcription.text.strip()
+            
+        finally:
+            # Clean up temporary file
+            import os
+            try:
+                os.unlink(tmp_file_path)
+            except:
+                pass
+                
+    except Exception as e:
+        print(f"Error transcribing audio: {e}")
+        raise HTTPException(status_code=500, detail=f"Audio transcription failed: {str(e)}")
 
-async def extract_entities_mock(transcription: str) -> dict:
-    """Mock entity extraction function"""
-    return {
-        "diagnosis": "streptococcal pharyngitis",
-        "medication": "Amoxicillin",
-        "dosage": "500mg",
-        "frequency": "twice daily",
-        "duration": "10 days",
-        "lab_orders": ["throat culture"]
-    }
+async def extract_entities(transcription: str) -> dict:
+    """Extract medical entities from transcription using LLM"""
+    try:
+        from openai import OpenAI
+        
+        # Initialize OpenAI client
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        
+        # Create a structured prompt for entity extraction
+        prompt = f"""
+        Extract medical entities from the following patient visit transcription. 
+        Return a JSON object with the following structure:
+        {{
+            "diagnosis": "Primary diagnosis or condition mentioned",
+            "medication": "Medication name if mentioned",
+            "dosage": "Dosage if mentioned",
+            "frequency": "Frequency if mentioned", 
+            "duration": "Duration if mentioned",
+            "lab_orders": ["List of lab orders or tests mentioned"]
+        }}
+        
+        If any information is not available, use null for that field.
+        Focus on extracting actual medical information from the transcription.
+        
+        Transcription: {transcription}
+        """
+        
+        # Call OpenAI API for entity extraction
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a medical AI assistant that extracts structured medical information from patient visit transcripts. Always return valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,  # Low temperature for consistent extraction
+            max_tokens=500
+        )
+        
+        # Parse the JSON response
+        import json
+        try:
+            entities = json.loads(response.choices[0].message.content)
+            
+            # Ensure all required fields exist with defaults
+            return {
+                "diagnosis": entities.get("diagnosis") or "Not specified",
+                "medication": entities.get("medication") or "Not specified", 
+                "dosage": entities.get("dosage") or "Not specified",
+                "frequency": entities.get("frequency") or "Not specified",
+                "duration": entities.get("duration") or "Not specified",
+                "lab_orders": entities.get("lab_orders") or []
+            }
+            
+        except json.JSONDecodeError:
+            # Fallback if JSON parsing fails
+            return {
+                "diagnosis": "Unable to extract diagnosis",
+                "medication": "Not specified",
+                "dosage": "Not specified", 
+                "frequency": "Not specified",
+                "duration": "Not specified",
+                "lab_orders": []
+            }
+            
+    except Exception as e:
+        print(f"Error extracting entities: {e}")
+        # Return safe defaults on error
+        return {
+            "diagnosis": "Error in entity extraction",
+            "medication": "Not specified",
+            "dosage": "Not specified",
+            "frequency": "Not specified", 
+            "duration": "Not specified",
+            "lab_orders": []
+        }
+
+def extract_text_from_pdf(file_content: bytes) -> str:
+    """Extract text from PDF file using pdfplumber (preferred) or PyPDF2 as fallback"""
+    try:
+        # Try pdfplumber first (better text extraction)
+        with pdfplumber.open(io.BytesIO(file_content)) as pdf:
+            text = ""
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+            return text.strip()
+    except Exception as e:
+        print(f"pdfplumber failed, trying PyPDF2: {e}")
+        try:
+            # Fallback to PyPDF2
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text() + "\n"
+            return text.strip()
+        except Exception as e2:
+            print(f"Both PDF libraries failed: {e2}")
+            raise Exception("Failed to extract text from PDF file")
 
 
 # Billing code functions
@@ -330,11 +459,11 @@ async def process_visit(file: UploadFile = File(...)):
     # Read the audio file content
     audio_bytes = await file.read()
     
-    # Step 1: Transcribe audio (mock)
-    transcription = await transcribe_audio_mock(audio_bytes)
+    # Step 1: Transcribe audio using OpenAI Whisper
+    transcription = await transcribe_audio(audio_bytes)
     
-    # Step 2: Extract entities from transcription (mock)
-    entities = await extract_entities_mock(transcription)
+    # Step 2: Extract entities from transcription using LLM
+    entities = await extract_entities(transcription)
     
     # Step 3: Generate SOAP note using the real SOAP agent
     soap_note = await generate_soap_note(transcription)
@@ -363,6 +492,249 @@ async def process_visit(file: UploadFile = File(...)):
     )
     
     return response
+
+@app.post("/api/process-text-context", response_model=ScribeAgentResponse)
+async def process_text_context(request: TextContextRequest):
+    """
+    Process text context through SOAP agent and return structured medical data
+    """
+    try:
+        print(f"📝 Processing text context: {request.text[:100]}...")
+        print(f"📝 Context type: {request.context_type}")
+        
+        # Process the text through SOAP agent with context
+        medical_data = await run_final_processing_with_context(request.text, request.context_type)
+        
+        # Check if we got structured JSON data from Mastra
+        if isinstance(medical_data, dict) and 'error' not in medical_data:
+            # We got structured data - use it directly
+            return ScribeAgentResponse(
+                transcription=medical_data.get('transcription', request.text),
+                soap_note=medical_data.get('soap_note', 'SOAP note not generated'),
+                diagnosis=medical_data.get('diagnosis', 'Not specified'),
+                billing_code=BillingCode(
+                    code=medical_data.get('billing_code', {}).get('code', 'R69'),
+                    description=medical_data.get('billing_code', {}).get('description', 'Illness, unspecified')
+                ),
+                prescriptions=[
+                    Prescription(
+                        medication=rx.get('medication', 'Not specified'),
+                        dosage=rx.get('dosage', 'Not specified'),
+                        frequency=rx.get('frequency', 'Not specified'),
+                        duration=rx.get('duration', 'Not specified')
+                    ) for rx in medical_data.get('prescriptions', [])
+                ] if medical_data.get('prescriptions') else [],
+                lab_orders=medical_data.get('lab_orders', [])
+            )
+        else:
+            # Fallback processing
+            entities = await extract_entities(request.text)
+            billing_code = get_billing_code(entities["diagnosis"])
+            
+            prescriptions = [
+                Prescription(
+                    medication=entities["medication"],
+                    dosage=entities["dosage"],
+                    frequency=entities["frequency"],
+                    duration=entities["duration"]
+                )
+            ]
+            
+            return ScribeAgentResponse(
+                transcription=request.text,
+                soap_note=f"Context: {request.context_type}\n\n{request.text}",
+                diagnosis=entities["diagnosis"],
+                billing_code=billing_code,
+                prescriptions=prescriptions,
+                lab_orders=entities["lab_orders"]
+            )
+            
+    except Exception as e:
+        print(f"❌ Error processing text context: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing text context: {str(e)}")
+
+@app.post("/api/process-pdf", response_model=ScribeAgentResponse)
+async def process_pdf_file(file: UploadFile = File(...)):
+    """
+    Process PDF file and extract text, then process through SOAP agent
+    """
+    try:
+        # Validate file type
+        if not file.content_type == "application/pdf" and not file.filename.endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="File must be a PDF")
+        
+        # Read file content
+        file_content = await file.read()
+        
+        # Extract text from PDF
+        print(f"📄 Extracting text from PDF: {file.filename}")
+        extracted_text = extract_text_from_pdf(file_content)
+        
+        if not extracted_text.strip():
+            raise HTTPException(status_code=400, detail="No text could be extracted from PDF")
+        
+        print(f"📄 Extracted text length: {len(extracted_text)} characters")
+        
+        # Process the extracted text through SOAP agent
+        medical_data = await run_final_processing_with_context(extracted_text, "medical_document")
+        
+        # Check if we got structured JSON data from Mastra
+        if isinstance(medical_data, dict) and 'error' not in medical_data:
+            # We got structured data - use it directly
+            return ScribeAgentResponse(
+                transcription=medical_data.get('transcription', extracted_text),
+                soap_note=medical_data.get('soap_note', 'SOAP note not generated'),
+                diagnosis=medical_data.get('diagnosis', 'Not specified'),
+                billing_code=BillingCode(
+                    code=medical_data.get('billing_code', {}).get('code', 'R69'),
+                    description=medical_data.get('billing_code', {}).get('description', 'Illness, unspecified')
+                ),
+                prescriptions=[
+                    Prescription(
+                        medication=rx.get('medication', 'Not specified'),
+                        dosage=rx.get('dosage', 'Not specified'),
+                        frequency=rx.get('frequency', 'Not specified'),
+                        duration=rx.get('duration', 'Not specified')
+                    ) for rx in medical_data.get('prescriptions', [])
+                ] if medical_data.get('prescriptions') else [],
+                lab_orders=medical_data.get('lab_orders', [])
+            )
+        else:
+            # Fallback processing
+            entities = await extract_entities(extracted_text)
+            billing_code = get_billing_code(entities["diagnosis"])
+            
+            prescriptions = [
+                Prescription(
+                    medication=entities["medication"],
+                    dosage=entities["dosage"],
+                    frequency=entities["frequency"],
+                    duration=entities["duration"]
+                )
+            ]
+            
+            return ScribeAgentResponse(
+                transcription=extracted_text,
+                soap_note=f"PDF Document Analysis:\n\n{extracted_text}",
+                diagnosis=entities["diagnosis"],
+                billing_code=billing_code,
+                prescriptions=prescriptions,
+                lab_orders=entities["lab_orders"]
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error processing PDF: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing PDF file: {str(e)}")
+
+@app.post("/api/process-multiple-files", response_model=ScribeAgentResponse)
+async def process_multiple_files(files: List[UploadFile] = File(...)):
+    """
+    Process multiple files (text and PDF) and combine their content for SOAP analysis
+    """
+    try:
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided")
+        
+        print(f"📁 Processing {len(files)} files")
+        
+        all_texts = []
+        
+        for file in files:
+            # Validate file type
+            if not (file.content_type in ["text/plain", "application/pdf"] or 
+                   file.filename.endswith(('.txt', '.pdf'))):
+                print(f"⚠️ Skipping unsupported file: {file.filename}")
+                continue
+            
+            # Read file content
+            file_content = await file.read()
+            
+            if file.content_type == "application/pdf" or file.filename.endswith('.pdf'):
+                # Extract text from PDF
+                print(f"📄 Extracting text from PDF: {file.filename}")
+                try:
+                    extracted_text = extract_text_from_pdf(file_content)
+                    if extracted_text.strip():
+                        all_texts.append(f"=== {file.filename} ===\n{extracted_text}")
+                    else:
+                        print(f"⚠️ No text extracted from PDF: {file.filename}")
+                except Exception as e:
+                    print(f"❌ Error extracting text from PDF {file.filename}: {e}")
+                    continue
+            else:
+                # Read text file content
+                print(f"📝 Reading text file: {file.filename}")
+                try:
+                    text_content = file_content.decode('utf-8')
+                    if text_content.strip():
+                        all_texts.append(f"=== {file.filename} ===\n{text_content}")
+                    else:
+                        print(f"⚠️ Empty text file: {file.filename}")
+                except Exception as e:
+                    print(f"❌ Error reading text file {file.filename}: {e}")
+                    continue
+        
+        if not all_texts:
+            raise HTTPException(status_code=400, detail="No valid text content found in any files")
+        
+        # Combine all text content
+        combined_text = "\n\n".join(all_texts)
+        print(f"📝 Combined text length: {len(combined_text)} characters from {len(all_texts)} files")
+        
+        # Process the combined text through SOAP agent
+        medical_data = await run_final_processing_with_context(combined_text, "multiple_documents")
+        
+        # Check if we got structured JSON data from Mastra
+        if isinstance(medical_data, dict) and 'error' not in medical_data:
+            # We got structured data - use it directly
+            return ScribeAgentResponse(
+                transcription=medical_data.get('transcription', combined_text),
+                soap_note=medical_data.get('soap_note', 'SOAP note not generated'),
+                diagnosis=medical_data.get('diagnosis', 'Not specified'),
+                billing_code=BillingCode(
+                    code=medical_data.get('billing_code', {}).get('code', 'R69'),
+                    description=medical_data.get('billing_code', {}).get('description', 'Illness, unspecified')
+                ),
+                prescriptions=[
+                    Prescription(
+                        medication=rx.get('medication', 'Not specified'),
+                        dosage=rx.get('dosage', 'Not specified'),
+                        frequency=rx.get('frequency', 'Not specified'),
+                        duration=rx.get('duration', 'Not specified')
+                    ) for rx in medical_data.get('prescriptions', [])
+                ] if medical_data.get('prescriptions') else [],
+                lab_orders=medical_data.get('lab_orders', [])
+            )
+        else:
+            # Fallback processing
+            entities = await extract_entities(combined_text)
+            billing_code = get_billing_code(entities["diagnosis"])
+            
+            prescriptions = [
+                Prescription(
+                    medication=entities["medication"],
+                    dosage=entities["dosage"],
+                    frequency=entities["frequency"],
+                    duration=entities["duration"]
+                )
+            ]
+            
+            return ScribeAgentResponse(
+                transcription=combined_text,
+                soap_note=f"Multi-Document Analysis:\n\n{combined_text}",
+                diagnosis=entities["diagnosis"],
+                billing_code=billing_code,
+                prescriptions=prescriptions,
+                lab_orders=entities["lab_orders"]
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error processing multiple files: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing multiple files: {str(e)}")
 
 async def save_transcript_to_db(text: str):
     """Save transcript to database"""
@@ -400,10 +772,10 @@ async def run_final_processing(transcript: str) -> dict:
                 for rx in medical_data['prescriptions']:
                     if isinstance(rx, dict):
                         prescriptions.append(Prescription(
-                            medication=rx.get('medication', 'Not entered'),
-                            dosage=rx.get('dosage', 'Not entered'),
-                            frequency=rx.get('frequency', 'Not entered'),
-                            duration=rx.get('duration', 'Not entered')
+                            medication=rx.get('medication', 'Not specified'),
+                            dosage=rx.get('dosage', 'Not specified'),
+                            frequency=rx.get('frequency', 'Not specified'),
+                            duration=rx.get('duration', 'Not specified')
                         ))
             
             if not prescriptions:
@@ -418,15 +790,15 @@ async def run_final_processing(transcript: str) -> dict:
             final_response = ScribeAgentResponse(
                 transcription=medical_data.get('transcription', transcript),
                 soap_note=medical_data.get('soap_note', 'SOAP note not generated'),
-                diagnosis=medical_data.get('diagnosis', 'Not entered'),
+                diagnosis=medical_data.get('diagnosis', 'Not specified'),
                 billing_code=billing_code,
                 prescriptions=prescriptions,
-                lab_orders=medical_data.get('lab_orders', ['Not entered'])
+                lab_orders=medical_data.get('lab_orders', [])
             )
             
         else:
             # We got a SOAP note string - use fallback extraction
-            entities = await extract_entities_mock(transcript)
+            entities = await extract_entities(transcript)
             billing_code = get_billing_code(entities["diagnosis"])
             
             prescriptions = [
@@ -450,6 +822,93 @@ async def run_final_processing(transcript: str) -> dict:
         return final_response.dict()
     except Exception as e:
         print(f"Error in final processing: {e}")
+        return {"error": str(e)}
+
+async def run_final_processing_with_context(text: str, context_type: str = "general") -> dict:
+    """Run final processing on text with additional context information"""
+    try:
+        # Enhance the text with context information for better SOAP agent processing
+        enhanced_text = f"""
+Context Type: {context_type}
+Text Content: {text}
+
+Please process this text as medical information and generate appropriate SOAP notes, diagnoses, and treatment plans.
+"""
+        
+        # Generate structured medical data using Mastra SOAP agent with enhanced context
+        mastra_result = await generate_soap_note(enhanced_text, context_type)
+        
+        # Check if we got structured JSON data from Mastra
+        if isinstance(mastra_result, dict):
+            # We got structured data - use it directly
+            medical_data = mastra_result
+            
+            # Ensure billing_code is properly formatted
+            if 'billing_code' in medical_data and isinstance(medical_data['billing_code'], dict):
+                billing_code = BillingCode(
+                    code=medical_data['billing_code']['code'],
+                    description=medical_data['billing_code']['description']
+                )
+            else:
+                # Fallback billing code
+                billing_code = get_billing_code(medical_data.get('diagnosis', 'unspecified condition'))
+            
+            # Ensure prescriptions are properly formatted
+            prescriptions = []
+            if 'prescriptions' in medical_data and isinstance(medical_data['prescriptions'], list):
+                for rx in medical_data['prescriptions']:
+                    if isinstance(rx, dict):
+                        prescriptions.append(Prescription(
+                            medication=rx.get('medication', 'Not specified'),
+                            dosage=rx.get('dosage', 'Not specified'),
+                            frequency=rx.get('frequency', 'Not specified'),
+                            duration=rx.get('duration', 'Not specified')
+                        ))
+            
+            if not prescriptions:
+                prescriptions = [Prescription(
+                    medication="Not entered",
+                    dosage="Not entered",
+                    frequency="Not entered",
+                    duration="Not entered"
+                )]
+            
+            # Assemble final response using Mastra data
+            final_response = ScribeAgentResponse(
+                transcription=medical_data.get('transcription', text),
+                soap_note=medical_data.get('soap_note', 'SOAP note not generated'),
+                diagnosis=medical_data.get('diagnosis', 'Not specified'),
+                billing_code=billing_code,
+                prescriptions=prescriptions,
+                lab_orders=medical_data.get('lab_orders', [])
+            )
+            
+        else:
+            # We got a SOAP note string - use fallback extraction
+            entities = await extract_entities(text)
+            billing_code = get_billing_code(entities["diagnosis"])
+            
+            prescriptions = [
+                Prescription(
+                    medication=entities["medication"],
+                    dosage=entities["dosage"],
+                    frequency=entities["frequency"],
+                    duration=entities["duration"]
+                )
+            ]
+            
+            final_response = ScribeAgentResponse(
+                transcription=text,
+                soap_note=str(mastra_result),
+                diagnosis=entities["diagnosis"],
+                billing_code=billing_code,
+                prescriptions=prescriptions,
+                lab_orders=entities["lab_orders"]
+            )
+        
+        return final_response.dict()
+    except Exception as e:
+        print(f"Error in final processing with context: {e}")
         return {"error": str(e)}
 
 @app.websocket("/ws/transcription")
@@ -492,6 +951,8 @@ async def transcription(websocket: WebSocket):
             
             print(f"📋 SOAP agent generated medical data: {medical_data.keys() if isinstance(medical_data, dict) else 'Not a dict'}")
             print(f"📋 Medical data structure: {medical_data}")
+            print(f"📋 Prescriptions in medical_data: {medical_data.get('prescriptions', 'NOT FOUND')}")
+            print(f"📋 Lab orders in medical_data: {medical_data.get('lab_orders', 'NOT FOUND')}")
             
             # Send structured medical data to client
             transcript_queue.put_nowait({
