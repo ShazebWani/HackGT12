@@ -14,6 +14,8 @@ export default function Home() {
   const [patientDob, setPatientDob] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [currentResults, setCurrentResults] = useState<any>(null)
+  const [results, setResults] = useState<any>(null)
+  const [isAudio, setIsAudio] = useState<any>(null)
 
   // Audio recorder state
   const [audioStatus, setAudioStatus] = useState<'idle' | 'recording'>('idle')
@@ -219,12 +221,12 @@ export default function Home() {
               </div>
               
               {/* Results Display - Off screen below */}
-              {currentResults && (
+              {results && (
                 <div className="p-8">
                   <div className="max-w-none mx-auto px-8">
                     <div id="results-section" className="medical-card">
                       <ResultsCard 
-                        results={currentResults}
+                        results={results}
                       />
                     </div>
                   </div>

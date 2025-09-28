@@ -128,7 +128,7 @@ interface PatientContextType {
   touchPatient: (id: string) => void;
   setSearchQuery: (query: string) => void;
   setPendingNewPatient: (patient: Partial<Patient> | null) => void;
-  addMedicalRecord: (patientId: string, record: MedicalRecord) => void;
+  addMedicalRecord: (patientId: string, record: any) => void;
 }
 
 // Create context
@@ -240,7 +240,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_PENDING_NEW_PATIENT', payload: patient });
   }, []);
 
-  const addMedicalRecord = useCallback((patientId: string, record: MedicalRecord) => {
+  const addMedicalRecord = useCallback((patientId: string, record: any) => {
     dispatch({ type: 'ADD_MEDICAL_RECORD', payload: { patientId, record } });
   }, []);
 
