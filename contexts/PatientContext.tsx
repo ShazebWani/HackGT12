@@ -165,6 +165,16 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     patients.forEach(patient => {
       dispatch({ type: 'LOAD_PATIENT', payload: patient });
     });
+    
+    // Load active patient from localStorage
+    try {
+      const activePatientId = localStorage.getItem('activePatientId');
+      if (activePatientId) {
+        dispatch({ type: 'SELECT_PATIENT', payload: activePatientId });
+      }
+    } catch (error) {
+      console.warn('Failed to load active patient from localStorage:', error);
+    }
   }, []);
 
   // Save to localStorage whenever patients change
@@ -173,6 +183,21 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
       savePatientsToStorage(state.patients);
     }
   }, [state.patients]);
+
+  // Save active patient to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        if (state.activePatientId) {
+          localStorage.setItem('activePatientId', state.activePatientId);
+        } else {
+          localStorage.removeItem('activePatientId');
+        }
+      } catch (error) {
+        console.warn('Failed to save active patient to localStorage:', error);
+      }
+    }
+  }, [state.activePatientId]);
 
   // Derived selectors using useMemo for performance
   const patientsSorted = useMemo(() => {

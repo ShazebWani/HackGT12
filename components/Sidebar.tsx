@@ -16,6 +16,7 @@ const Sidebar = () => {
     setIsClient(true);
     
     try {
+      // Load auth info
       const auth = localStorage.getItem('auth');
       if (auth) {
         const user = JSON.parse(auth);
@@ -24,8 +25,14 @@ const Sidebar = () => {
           role: user.role || 'Unknown'
         });
       }
+      
+      // Load sidebar collapse state after client hydration
+      const sidebarState = localStorage.getItem('sidebarCollapsed');
+      if (sidebarState === 'true') {
+        setIsCollapsed(true);
+      }
     } catch (e) {
-      console.error('Error parsing auth:', e);
+      console.error('Error parsing localStorage:', e);
     }
   }, []);
 
@@ -44,7 +51,10 @@ const Sidebar = () => {
   };
 
   const toggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
+    const newCollapsedState = !isCollapsed;
+    setIsCollapsed(newCollapsedState);
+    // Persist sidebar state
+    localStorage.setItem('sidebarCollapsed', newCollapsedState.toString());
   };
 
   return (
@@ -66,11 +76,9 @@ const Sidebar = () => {
               <Stethoscope className="size-6" />
             )}
           </div>
-          {!isCollapsed && (
-            <span className="text-white/70 text-sm whitespace-nowrap overflow-hidden">
-              {filteredPatients.length} patient{filteredPatients.length !== 1 ? 's' : ''}
-            </span>
-          )}
+          <div className={`text-white/70 text-sm whitespace-nowrap overflow-hidden ${isCollapsed ? 'hidden' : ''}`}>
+            {isClient ? `${filteredPatients.length} patient${filteredPatients.length !== 1 ? 's' : ''}` : '0 patients'}
+          </div>
         </button>
         {!isCollapsed && (
           <button
@@ -90,15 +98,11 @@ const Sidebar = () => {
             <div className="flex-shrink-0 flex items-center justify-center">
               <UserCircle className="h-6 w-6 text-white/80" />
             </div>
-            {!isCollapsed && (
-              <>
-                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                  <div className="text-white/90 text-xs font-medium truncate">{userInfo.username}</div>
-                  <div className="text-white/60 text-xs capitalize">{userInfo.role}</div>
-                </div>
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${userInfo.role === 'doctor' ? 'bg-green-400' : 'bg-blue-400'}`}></div>
-              </>
-            )}
+            <div className={`flex-1 min-w-0 flex flex-col justify-center ${isCollapsed ? 'hidden' : ''}`}>
+              <div className="text-white/90 text-xs font-medium truncate">{isClient ? userInfo.username : 'Loading...'}</div>
+              <div className="text-white/60 text-xs capitalize">{isClient ? userInfo.role : 'Unknown'}</div>
+            </div>
+            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isClient && userInfo.role === 'doctor' ? 'bg-green-400' : 'bg-blue-400'} ${isCollapsed ? 'hidden' : ''}`}></div>
           </div>
         </div>
 
@@ -112,9 +116,9 @@ const Sidebar = () => {
             <div className="flex-shrink-0 flex items-center justify-center">
               <Plus className="h-6 w-6 text-white/80" />
             </div>
-            {!isCollapsed && (
-              <span className="text-white/90 text-xs font-medium truncate flex items-center">Create New Patient</span>
-            )}
+            <div className={`text-white/90 text-xs font-medium truncate flex items-center ${isCollapsed ? 'hidden' : ''}`}>
+              Create New Patient
+            </div>
           </button>
         )}
       </div>

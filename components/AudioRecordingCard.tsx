@@ -144,8 +144,8 @@ PLAN:
         }
         
         setIsProcessing(false)
+        setAudioResults(mockResults)
         handleRecordingResults(mockResults)
-        stopAll()
       }, 2200) // 2.2s processing simulation
     }
   }, [stopRecording])
@@ -168,70 +168,126 @@ PLAN:
         <h3 className="text-lg font-semibold text-accent-1">Audio Recording</h3>
       </div>
       
-      <div className="text-center">
-        <div className="mb-4">
-          <p className="text-gray-600 mb-2">Record patient consultation</p>
-          <p className="text-sm text-gray-500">Click to start/stop recording</p>
-          <p className="text-sm text-gray-500">Results: {audioResults?.transcription}</p>
+      <div className="flex flex-col items-center justify-center min-h-[300px] space-y-8">
+        <div className="text-center">
+          <p className="text-gray-600 mb-6">Record patient consultation</p>
         </div>
         
         {/* Recording Controls */}
-        <div className="flex flex-col items-center space-y-4 mb-6">
-          <div
-            className={clsx(
-              'h-16 w-16 rounded-full transition-all flex items-center justify-center',
-              isProcessing 
-                ? 'animate-spin bg-blue-500' 
-                : audioStatus === 'recording' 
-                  ? 'animate-pulse bg-red-500' 
-                  : 'bg-gray-300'
-            )}
-            aria-hidden
-          >
-            {isProcessing ? (
-              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            ) : audioStatus === 'recording' ? (
-              <div className="w-4 h-4 bg-white rounded-sm"></div>
-            ) : (
-              <div className="w-0 h-0 border-l-[6px] border-l-white border-y-[4px] border-y-transparent ml-1"></div>
-            )}
-          </div>
-          
-          <button
-            onClick={handleRecordClick}
-            disabled={isProcessing}
-            className={clsx(
-              'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none',
-              'px-8 py-3 text-base font-medium',
-              audioStatus === 'recording' 
-                ? 'bg-red-600 hover:bg-red-700 text-white focus-visible:ring-red-500' 
-                : 'bg-blue-600 hover:bg-blue-700 text-white focus-visible:ring-blue-500',
-              isProcessing && 'opacity-50 cursor-not-allowed'
-            )}
-          >
-            {isProcessing ? 'Processing...' : audioStatus === 'idle' ? 'Record' : 'Stop'}
-          </button>
-          
-          <p className="text-sm text-gray-600 text-center">
-            {isProcessing 
-              ? 'Processing your recording...' 
-              : audioStatus === 'recording' 
-                ? 'Recording… tap Stop to finish' 
-                : 'Tap Record to start'
-            }
-          </p>
-        </div>
-
-        {/* Instructions */}
-        <div className="text-xs text-gray-500 space-y-1 mt-4">
-          <p>• Allow microphone access when prompted</p>
-          <p>• Speak clearly and at normal pace</p>
-          <p>• Audio is recorded in memory only (not saved to disk)</p>
-          <p>• Click stop when finished to get full analysis</p>
+        <div className="flex flex-col items-center justify-center space-y-6 h-40">
+          {isProcessing ? (
+            // Heart Monitor Animation (copied from ProcessingIndicator)
+            <div className="flex flex-col items-center justify-center">
+              <div className="mb-2">
+                <svg width="80" height="32" viewBox="0 0 80 32" className="heartbeat-svg">
+                  {/* Background path (greyed out) */}
+                  <path
+                    d="M0 16 L15 16 L18 8 L22 24 L26 4 L30 28 L34 16 L80 16"
+                    stroke="#d1d5db"
+                    strokeWidth="2"
+                    fill="none"
+                  />
+                  {/* Animated path (traced over) */}
+                  <path
+                    d="M0 16 L15 16 L18 8 L22 24 L26 4 L30 28 L34 16 L80 16"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="none"
+                    className="heartbeat-trace text-accent-1"
+                  />
+                </svg>
+              </div>
+              <p className="text-accent-1 text-sm font-medium">Processing...</p>
+              
+              <style jsx>{`
+                .heartbeat-trace {
+                  stroke-dasharray: 120;
+                  stroke-dashoffset: 120;
+                  animation: trace 2s infinite ease-in-out;
+                }
+                
+                @keyframes trace {
+                  0% {
+                    stroke-dashoffset: 120;
+                  }
+                  50% {
+                    stroke-dashoffset: 0;
+                  }
+                  100% {
+                    stroke-dashoffset: -120;
+                  }
+                }
+              `}</style>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center space-y-4">
+              {/* Audio Levels Graph */}
+              <div className="flex items-end justify-center gap-1 h-16">
+                {[...Array(12)].map((_, i) => {
+                  const baseHeights = [8, 12, 18, 24, 32, 28, 36, 24, 18, 14, 10, 6];
+                  const baseHeight = baseHeights[i];
+                  
+                  return (
+                    <div
+                      key={i}
+                      className={clsx(
+                        'w-1.5 rounded-sm transition-colors duration-200',
+                        audioStatus === 'recording'
+                          ? 'bg-accent-1 audio-level-bar'
+                          : 'bg-gray-300'
+                      )}
+                      style={{
+                        height: `${baseHeight}px`,
+                        animationDelay: `${i * 0.1}s`
+                      }}
+                    />
+                  );
+                })}
+              </div>
+              
+              <style jsx>{`
+                .audio-level-bar {
+                  animation: audioLevel 0.8s ease-in-out infinite alternate;
+                  transform-origin: bottom;
+                }
+                
+                @keyframes audioLevel {
+                  0% {
+                    transform: scaleY(0.3);
+                    opacity: 0.7;
+                  }
+                  50% {
+                    transform: scaleY(1.2);
+                    opacity: 1;
+                  }
+                  100% {
+                    transform: scaleY(0.6);
+                    opacity: 0.8;
+                  }
+                }
+              `}</style>
+              
+              {/* Record Button - Matching Upload Theme */}
+              <button
+                onClick={handleRecordClick}
+                disabled={isProcessing}
+                className={clsx(
+                  'inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none',
+                  audioStatus === 'recording' 
+                    ? 'bg-red-500 hover:bg-red-600 text-white focus-visible:ring-red-500' 
+                    : 'bg-accent-1 hover:bg-accent-1/90 text-white focus-visible:ring-accent-1'
+                )}
+              >
+                <Mic className="h-4 w-4 mr-2" />
+                {audioStatus === 'idle' ? 'Start Recording' : 'Stop Recording'}
+              </button>
+            </div>
+          )}
         </div>
         
-        <div className="mt-4 text-xs text-gray-500">
-          <p>Audio data is processed and discarded after analysis</p>
+        {/* HIPAA Privacy Notice */}
+        <div className="text-center">
+          <p className="text-xs text-gray-500">🔒 HIPAA compliant - Audio encrypted and automatically deleted</p>
         </div>
       </div>
     </div>

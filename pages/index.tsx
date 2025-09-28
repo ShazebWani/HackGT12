@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, User } from 'lucide-react'
+import { Search, User, ChevronDown } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import PatientInfoCard from '../components/PatientInfoCard'
 import PatientDisplayCard from '../components/PatientDisplayCard'
@@ -39,11 +39,9 @@ export default function Home() {
 
     if (!recordingResults) return;
 
-    // Always set just the transcription string, not the whole object
-    const text = recordingResults.transcription;
-
-    setIsAudio(text);  // <-- store string, not object
-    setIsProcessing(!recordingResults.isFinal); // still use isFinal for processing state
+    // Set the full results object for display
+    setResults(recordingResults);
+    setIsProcessing(false);
   };
 
   // Auto-scroll to results when they appear
@@ -210,10 +208,23 @@ Follow-up: ${medicalData.followUpInstructions}`,
                   />
                 </div>
                 
+                {/* Bouncing Arrow when results are ready */}
+                {displayResults && (
+                  <div className="flex items-center justify-center mb-6">
+                    <button
+                      onClick={scrollToResults}
+                      className="p-3 text-gray-500 hover:text-accent-1 hover:bg-black/5 rounded-full transition-colors animate-bounce"
+                      title="Scroll to results"
+                    >
+                      <ChevronDown className="h-6 w-6" />
+                    </button>
+                  </div>
+                )}
+                
                 {/* Results Area */}
                 {displayResults && (
-                  <div className="medical-card">
-                    <ResultsCard results={displayResults} />
+                  <div id="results-section" className="medical-card">
+                    <ResultsCard results={displayResults} onSend={sendResultsToPatient} />
                   </div>
                 )}
                 
