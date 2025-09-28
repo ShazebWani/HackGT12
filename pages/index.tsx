@@ -1,31 +1,28 @@
 import { useState, useEffect } from 'react'
-import { Search, User, ChevronDown } from 'lucide-react'
+import { User } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import PatientInfoCard from '../components/PatientInfoCard'
 import PatientDisplayCard from '../components/PatientDisplayCard'
 import AudioRecordingCard from '../components/AudioRecordingCard'
 import TextFileUploadCard from '../components/TextFileUploadCard'
 import ResultsCard from '@/components/ResultsCard'
-import ProcessingIndicator from '@/components/ProcessingIndicator'
 import TypeWriter from '@/components/TypeWriter'
 import { usePatient } from '../contexts/PatientContext'
 
 export default function Home() {
   const [patientName, setPatientName] = useState('')
   const [patientDob, setPatientDob] = useState('')
-  const [results, setResults] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [isAudio, setIsAudio] = useState(false)
+  const [currentResults, setCurrentResults] = useState<any>(null)
 
   // Audio recorder state
   const [audioStatus, setAudioStatus] = useState<'idle' | 'recording'>('idle')
   
   // Patient context
-  const { state, activePatient } = usePatient()
+  const { state, activePatient, addMedicalRecord } = usePatient()
 
   const startRecording = () => {
     setAudioStatus('recording')
-    setResults(null)
     setIsProcessing(false)
   }
 
@@ -37,71 +34,48 @@ export default function Home() {
   const handleRecordingResults = (recordingResults: any) => {
     console.log("Recording results:", recordingResults);
 
-    if (!recordingResults) return;
+    if (!recordingResults || !activePatient) return;
 
-    // Set the full results object for display
-    setResults(recordingResults);
+    // Create a new medical record
+    const newRecord = {
+      id: `record-${Date.now()}`,
+      date: new Date().toISOString(),
+      transcription: recordingResults.transcription,
+      soap_note: recordingResults.soap_note,
+      diagnosis: recordingResults.diagnosis,
+      billing_code: recordingResults.billing_code,
+      prescriptions: recordingResults.prescriptions || [],
+      lab_orders: recordingResults.lab_orders || []
+    };
+
+    // Add the record to the patient's medical records
+    addMedicalRecord(activePatient.id, newRecord);
+    
+    // Show the results temporarily
+    setCurrentResults(recordingResults);
     setIsProcessing(false);
+    
+    // Auto-scroll to results after a short delay
+    setTimeout(() => {
+      const resultsSection = document.getElementById('results-section');
+      if (resultsSection) {
+        resultsSection.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    }, 100);
+    
+    // Hide results after 10 seconds
+    setTimeout(() => {
+      setCurrentResults(null);
+    }, 10000);
   };
-
-  // Auto-scroll to results when they appear
-  useEffect(() => {
-    if (results) {
-      // Small delay to ensure the results section is rendered
-      setTimeout(() => {
-        const resultsSection = document.getElementById('results-section')
-        if (resultsSection) {
-          resultsSection.scrollIntoView({ 
-            behavior: 'smooth',
-            block: 'start'
-          })
-        }
-      }, 100)
-    }
-  }, [results])
-
-  const scrollToResults = () => {
-    const resultsSection = document.getElementById('results-section')
-    if (resultsSection) {
-      resultsSection.scrollIntoView({ 
-        behavior: 'smooth',
-        block: 'start'
-      })
-    }
-  }
 
   const handleTextFileUpload = (file: File) => {
     console.log('Text file uploaded:', file.name)
     // Here you could read the file content and process it
   }
-
-  // Transform patient medical data for ResultsDisplay component format
-  const getResultsFromPatient = (patient: any) => {
-    if (!patient?.medicalData) return null;
-    
-    const medicalData = patient.medicalData;
-    return {
-      transcription: `Patient: ${medicalData.patientName}. Chief complaint: ${medicalData.chiefComplaint}. ${medicalData.historyOfPresentIllness}`,
-      soap_note: `Subjective: ${medicalData.chiefComplaint}
-
-${medicalData.historyOfPresentIllness}
-
-Objective: ${medicalData.physicalExam}
-
-Assessment: ${medicalData.assessment}
-
-Plan: ${medicalData.plan}
-
-Follow-up: ${medicalData.followUpInstructions}`,
-      diagnosis: medicalData.assessment,
-      billing_code: medicalData.billingCodes?.[0] || { code: '', description: '' },
-      prescriptions: medicalData.prescriptions || [],
-      lab_orders: [] // This could be extracted from plan if needed
-    };
-  };
-
-  // Get results from active patient or current results
-  const displayResults = results || getResultsFromPatient(activePatient);
 
   // Enforce auth/redirect based on role
   useEffect(() => {
@@ -123,6 +97,11 @@ Follow-up: ${medicalData.followUpInstructions}`,
     }
   }, [])
 
+  // Clear results when active patient changes
+  useEffect(() => {
+    setCurrentResults(null);
+  }, [activePatient?.id]);
+
   // Helper: append a message to localStorage for a recipient (messages:username)
   const appendMessageForUser = (recipient: string, message: any) => {
     if (!recipient) return false
@@ -138,27 +117,6 @@ Follow-up: ${medicalData.followUpInstructions}`,
     }
   }
 
-  const sendResultsToPatient = () => {
-    const authRaw = localStorage.getItem('auth')
-    const user = authRaw ? JSON.parse(authRaw) : { username: 'Doctor' }
-    const recipient = patientName?.trim()
-    if (!recipient) {
-      alert('Please enter patient name in Patient Info before sending results.')
-      return
-    }
-
-    const msg = {
-      from: user.username || 'Doctor',
-      type: 'results',
-      body: `Medical results for ${recipient}: ${results ? results.diagnosis || 'No diagnosis' : 'No results'}`,
-      meta: { results },
-      timestamp: Date.now()
-    }
-
-    const ok = appendMessageForUser(recipient, msg)
-    if (ok) alert('Results sent to patient portal')
-  }
-
   return (
     <div className="flex h-screen min-h-screen bg-base overflow-clip">
       <Sidebar />
@@ -167,7 +125,7 @@ Follow-up: ${medicalData.followUpInstructions}`,
 
           {/* Patient Info - Show search form when no patient selected, display card when patient selected */}
           {!activePatient ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-6">
+            <div className="flex-1 flex flex-col items-center justify-center p-12">
               <div className="text-center mb-8">
                 <h1 className="text-2xl font-bold text-accent-1 mb-4">
                   Hi I'm ScribeAgentAI
@@ -180,7 +138,7 @@ Follow-up: ${medicalData.followUpInstructions}`,
                   />
                 </div>
               </div>
-              <div className="w-full max-w-6xl">
+              <div className="w-full px-32">
                 <PatientInfoCard 
                   patientName={patientName}
                   setPatientName={setPatientName}
@@ -190,61 +148,40 @@ Follow-up: ${medicalData.followUpInstructions}`,
               </div>
             </div>
           ) : (
-            <div className="p-6">
-              <div className="max-w-6xl mx-auto">
-                <PatientDisplayCard />
-              
-                {/* Input Cards - Only show when a patient is selected */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                  <AudioRecordingCard 
-                    audioStatus={audioStatus}
-                    startRecording={startRecording}
-                    stopRecording={stopRecording}
-                    handleRecordingResults={handleRecordingResults}
-                  />
-                  
-                  <TextFileUploadCard 
-                    onFileUpload={handleTextFileUpload}
-                  />
+            <div className="min-h-screen">
+              {/* Centered patient section */}
+              <div className="min-h-screen flex flex-col justify-center p-12">
+                <div className="w-full px-8">
+                  <PatientDisplayCard />
+                
+                  {/* Input Cards - Only show when a patient is selected */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <AudioRecordingCard 
+                      audioStatus={audioStatus}
+                      startRecording={startRecording}
+                      stopRecording={stopRecording}
+                      handleRecordingResults={handleRecordingResults}
+                    />
+                    
+                    <TextFileUploadCard 
+                      onFileUpload={handleTextFileUpload}
+                    />
+                  </div>
                 </div>
-                
-                {/* Bouncing Arrow when results are ready */}
-                {displayResults && (
-                  <div className="flex items-center justify-center mb-6">
-                    <button
-                      onClick={scrollToResults}
-                      className="p-3 text-gray-500 hover:text-accent-1 hover:bg-black/5 rounded-full transition-colors animate-bounce"
-                      title="Scroll to results"
-                    >
-                      <ChevronDown className="h-6 w-6" />
-                    </button>
-                  </div>
-                )}
-                
-                {/* Results Area */}
-                {displayResults && (
-                  <div id="results-section" className="medical-card">
-                    <ResultsCard results={displayResults} onSend={sendResultsToPatient} />
-                  </div>
-                )}
-                
-                {!displayResults && !isProcessing && (
-                  <div className="medical-card text-center py-12">
-                    <div className="text-gray-400 mb-4">
-                      <User className="h-16 w-16 mx-auto mb-4" />
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      Patient Selected: {activePatient.firstName} {activePatient.lastName}
-                    </h3>
-                    <p className="text-gray-500 mb-4">
-                      Record audio or upload text to generate medical documentation.
-                    </p>
-                    <div className="text-sm text-gray-400">
-                      MRN: {activePatient.mrn} • DOB: {activePatient.dateOfBirth}
-                    </div>
-                  </div>
-                )}
               </div>
+              
+              {/* Results Display - Off screen below */}
+              {currentResults && (
+                <div className="p-8">
+                  <div className="max-w-none mx-auto px-8">
+                    <div id="results-section" className="medical-card">
+                      <ResultsCard 
+                        results={currentResults}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

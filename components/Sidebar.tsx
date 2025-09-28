@@ -58,7 +58,7 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className={`h-full bg-accent-1/50 flex flex-col transition-all duration-300 ${
+    <aside className={`h-full bg-accent-1/80 flex flex-col transition-all duration-300 ${
       isCollapsed ? 'w-12' : 'w-64'
     }`}>
       {/* Header */}

@@ -168,13 +168,13 @@ PLAN:
         <h3 className="text-lg font-semibold text-accent-1">Audio Recording</h3>
       </div>
       
-      <div className="flex flex-col items-center justify-center min-h-[300px] space-y-8">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-8">
         <div className="text-center">
           <p className="text-gray-600 mb-6">Record patient consultation</p>
         </div>
         
         {/* Recording Controls */}
-        <div className="flex flex-col items-center justify-center space-y-6 h-40">
+        <div className="flex flex-col items-center justify-center space-y-6 h-[20vh]">
           {isProcessing ? (
             // Heart Monitor Animation (copied from ProcessingIndicator)
             <div className="flex flex-col items-center justify-center">
@@ -220,7 +220,7 @@ PLAN:
               `}</style>
             </div>
           ) : (
-            <div className="flex flex-col items-center space-y-4">
+            <div className="flex flex-col items-center space-y-6">
               {/* Audio Levels Graph */}
               <div className="flex items-end justify-center gap-1 h-16">
                 {[...Array(12)].map((_, i) => {
@@ -267,18 +267,18 @@ PLAN:
                 }
               `}</style>
               
-              {/* Record Button - Matching Upload Theme */}
+              {/* Record Button - Standardized Size */}
               <button
                 onClick={handleRecordClick}
                 disabled={isProcessing}
                 className={clsx(
-                  'inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none',
+                  'inline-flex items-center justify-center px-8 py-4 rounded-lg font-medium text-lg min-w-[12rem] min-h-[3.5rem] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none',
                   audioStatus === 'recording' 
                     ? 'bg-red-500 hover:bg-red-600 text-white focus-visible:ring-red-500' 
                     : 'bg-accent-1 hover:bg-accent-1/90 text-white focus-visible:ring-accent-1'
                 )}
               >
-                <Mic className="h-4 w-4 mr-2" />
+                <Mic className="h-5 w-5 mr-2" />
                 {audioStatus === 'idle' ? 'Start Recording' : 'Stop Recording'}
               </button>
             </div>

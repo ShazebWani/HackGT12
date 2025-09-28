@@ -20,14 +20,14 @@ interface ResultsCardProps {
 }
 
 interface ResultsCardPropsExtended extends ResultsCardProps {
-  onSend?: () => void
+  // No additional props needed
 }
 
-export default function ResultsCard({ results, onSend }: ResultsCardPropsExtended) {
+export default function ResultsCard({ results }: ResultsCardPropsExtended) {
   if (!results) return null
 
   return (
-    <div className="medical-card w-full min-h-screen">
+    <div className="medical-card w-full">
       {/* Header */}
       <div className="flex items-center gap-2 mb-6">
         <FileText className="h-5 w-5 text-accent-1" />
@@ -126,9 +126,6 @@ export default function ResultsCard({ results, onSend }: ResultsCardPropsExtende
         <div className="flex space-x-4 pt-6 border-t border-gray-200">
           <button className="flex-1 bg-accent-1 hover:bg-accent-1/90 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md">
             Approve & Sign
-          </button>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md" onClick={onSend}>
-            Send to Patient
           </button>
           <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md">
             Edit & Review

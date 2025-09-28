@@ -82,7 +82,7 @@ const TextFileUploadCard = ({ onFileUpload, onTextInput }: TextFileUploadProps) 
       </div>
       
       {/* Content Area with Fade Transition */}
-      <div className="relative min-h-[280px]">
+      <div className="relative min-h-[40vh]">
         {/* Notepad Mode */}
         <div className={`absolute inset-0 transition-all duration-500 ease-in-out ${
           isNotepadMode 
@@ -94,7 +94,7 @@ const TextFileUploadCard = ({ onFileUpload, onTextInput }: TextFileUploadProps) 
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
               placeholder="Enter patient notes, observations, or any text content..."
-              className="flex-1 min-h-[180px] w-full p-4 border-2 border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-accent-1 focus:border-transparent transition-all duration-200"
+              className="flex-1 min-h-[25vh] w-full p-4 border-2 border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-accent-1 focus:border-transparent transition-all duration-200"
             />
             <div className="flex justify-between items-center flex-shrink-0">
               <p className="text-xs text-gray-500">
@@ -103,7 +103,7 @@ const TextFileUploadCard = ({ onFileUpload, onTextInput }: TextFileUploadProps) 
               <button
                 onClick={handleNoteSubmit}
                 disabled={!noteText.trim()}
-                className="px-4 py-2 bg-accent-1 text-white rounded-lg hover:bg-accent-1/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-8 py-4 bg-accent-1 text-white rounded-lg hover:bg-accent-1/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-lg min-w-[12rem] min-h-[3.5rem]"
               >
                 Save Notes
               </button>
@@ -159,7 +159,7 @@ const TextFileUploadCard = ({ onFileUpload, onTextInput }: TextFileUploadProps) 
                 />
                 <label
                   htmlFor="text-file-input"
-                  className="inline-block px-6 py-3 bg-accent-1 text-white rounded-lg hover:bg-accent-1/90 transition-colors cursor-pointer font-medium"
+                  className="inline-block px-8 py-4 bg-accent-1 text-white rounded-lg hover:bg-accent-1/90 transition-colors cursor-pointer font-medium text-lg min-w-[12rem] min-h-[3.5rem]"
                 >
                   Choose File
                 </label>
