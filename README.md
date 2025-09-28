@@ -59,11 +59,11 @@ python test_websocket.py
 
 ## 📡 API Endpoints
 
-### 🔄 WebSocket `/ws/process-visit` (NEW!)
+### 🔄 WebSocket `/ws/transcription`
 
 **Real-time audio streaming endpoint for live transcription**
 
-**Connection:** `ws://localhost:8000/ws/process-visit`
+**Connection:** `ws://localhost:8000/ws/transcription`
 
 **Message Flow:**
 1. **Client → Server:** Binary audio chunks (bytes)

@@ -62,14 +62,14 @@ const AudioRecordingCard = ({ audioStatus, startRecording, stopRecording, handle
           // Check if we have structured medical data or just transcription
           if (data.data && data.data.transcription && data.data.soap_note) {
             // Full structured medical data
-            console.log("✅ Full SOAP agent data received - calling setAudioResults");
-            setAudioResults?.(data.data)
+            console.log("✅ Full SOAP agent data received - calling handleRecordingResults");
+            handleRecordingResults(data.data)
           } else if (data.data && data.data.transcription) {
             // Just transcription (fallback)
-            console.log("⚠️ Only transcription received, no SOAP data - calling setAudioResults with fallback");
-            setAudioResults?.({ transcription: data.data.transcription, isFinal: true })
+            console.log("⚠️ Only transcription received, no SOAP data - calling handleRecordingResults with fallback");
+            handleRecordingResults({ transcription: data.data.transcription, isFinal: true })
           } else {
-            console.log("❌ No valid data in final result - not calling setAudioResults");
+            console.log("❌ No valid data in final result - not calling handleRecordingResults");
           }
           ws.close()  // close here, not earlier
           setIsProcessing(false)

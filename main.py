@@ -5,14 +5,13 @@ from typing import List, Optional, Dict
 import csv
 import os
 import asyncio
-import assemblyai as aai
 from backend.realtime_transcribe import AudioTranscribe
 import threading
 import json
 from datetime import datetime
 from dotenv import load_dotenv
 from database import database, transcripts, patients
-from agents.soap_agent import generate_soap_note
+from agents.mastra_soap_agent import generate_soap_note
 
 # Load environment variables
 load_dotenv()
@@ -129,8 +128,6 @@ def get_billing_code(diagnosis: str) -> BillingCode:
 # Load billing codes on startup
 load_billing_codes()
 
-# Configure AssemblyAI with environment variable
-aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
 
 # Database startup and shutdown handlers
 @app.on_event("startup")
@@ -379,162 +376,81 @@ async def save_transcript_to_db(text: str):
 async def run_final_processing(transcript: str) -> dict:
     """Run final processing on the complete transcript"""
     try:
-        # Step 1: Extract entities from the final transcript
-        entities = await extract_entities_mock(transcript)
+        # Generate structured medical data using Mastra SOAP agent
+        mastra_result = await generate_soap_note(transcript)
         
-        # Step 2: Generate SOAP note using the real SOAP agent
-        soap_note = await generate_soap_note(transcript)
-        
-        # Step 3: Get billing code using real lookup function
-        billing_code = get_billing_code(entities["diagnosis"])
-        
-        # Step 4: Create prescriptions from extracted entities
-        prescriptions = [
-            Prescription(
-                medication=entities["medication"],
-                dosage=entities["dosage"],
-                frequency=entities["frequency"],
-                duration=entities["duration"]
+        # Check if we got structured JSON data from Mastra
+        if isinstance(mastra_result, dict):
+            # We got structured data - use it directly
+            medical_data = mastra_result
+            
+            # Ensure billing_code is properly formatted
+            if 'billing_code' in medical_data and isinstance(medical_data['billing_code'], dict):
+                billing_code = BillingCode(
+                    code=medical_data['billing_code']['code'],
+                    description=medical_data['billing_code']['description']
+                )
+            else:
+                # Fallback billing code
+                billing_code = get_billing_code(medical_data.get('diagnosis', 'unspecified condition'))
+            
+            # Ensure prescriptions are properly formatted
+            prescriptions = []
+            if 'prescriptions' in medical_data and isinstance(medical_data['prescriptions'], list):
+                for rx in medical_data['prescriptions']:
+                    if isinstance(rx, dict):
+                        prescriptions.append(Prescription(
+                            medication=rx.get('medication', 'Not entered'),
+                            dosage=rx.get('dosage', 'Not entered'),
+                            frequency=rx.get('frequency', 'Not entered'),
+                            duration=rx.get('duration', 'Not entered')
+                        ))
+            
+            if not prescriptions:
+                prescriptions = [Prescription(
+                    medication="Not entered",
+                    dosage="Not entered",
+                    frequency="Not entered",
+                    duration="Not entered"
+                )]
+            
+            # Assemble final response using Mastra data
+            final_response = ScribeAgentResponse(
+                transcription=medical_data.get('transcription', transcript),
+                soap_note=medical_data.get('soap_note', 'SOAP note not generated'),
+                diagnosis=medical_data.get('diagnosis', 'Not entered'),
+                billing_code=billing_code,
+                prescriptions=prescriptions,
+                lab_orders=medical_data.get('lab_orders', ['Not entered'])
             )
-        ]
-        
-        # Step 5: Assemble final response
-        final_response = ScribeAgentResponse(
-            transcription=transcript,
-            soap_note=soap_note,
-            diagnosis=entities["diagnosis"],
-            billing_code=billing_code,
-            prescriptions=prescriptions,
-            lab_orders=entities["lab_orders"]
-        )
+            
+        else:
+            # We got a SOAP note string - use fallback extraction
+            entities = await extract_entities_mock(transcript)
+            billing_code = get_billing_code(entities["diagnosis"])
+            
+            prescriptions = [
+                Prescription(
+                    medication=entities["medication"],
+                    dosage=entities["dosage"],
+                    frequency=entities["frequency"],
+                    duration=entities["duration"]
+                )
+            ]
+            
+            final_response = ScribeAgentResponse(
+                transcription=transcript,
+                soap_note=str(mastra_result),
+                diagnosis=entities["diagnosis"],
+                billing_code=billing_code,
+                prescriptions=prescriptions,
+                lab_orders=entities["lab_orders"]
+            )
         
         return final_response.dict()
     except Exception as e:
         print(f"Error in final processing: {e}")
         return {"error": str(e)}
-
-@app.websocket("/ws/process-visit")
-async def websocket_process_visit(websocket: WebSocket):
-    """
-    WebSocket endpoint for real-time audio streaming and transcription
-    """
-    await websocket.accept()
-    print("WebSocket connection established")
-    
-    # Storage for the complete final transcript
-    final_transcript = ""
-    
-    async def handle_partial_transcript_local(data):
-        """Handle partial transcript data from AssemblyAI"""
-        nonlocal final_transcript
-        try:
-            if data.text:
-                final_transcript = data.text
-                # Send partial transcript to client
-                await websocket.send_json({
-                    "type": "partial_transcript",
-                    "text": data.text,
-                    "is_final": data.is_final
-                })
-                print(f"Partial transcript: {data.text}")
-        except Exception as e:
-            print(f"Error handling partial transcript: {e}")
-
-    async def handle_error_local(error):
-        """Handle errors from AssemblyAI"""
-        try:
-            print(f"AssemblyAI error: {error}")
-            await websocket.send_json({
-                "type": "error",
-                "message": f"Transcription error: {str(error)}"
-            })
-        except Exception as e:
-            print(f"Error handling AssemblyAI error: {e}")
-
-    async def handle_close_local():
-        """Handle AssemblyAI stream close"""
-        try:
-            print(f"AssemblyAI stream closed. Final transcript: {final_transcript}")
-            
-            if final_transcript:
-                # Save transcript to database
-                await save_transcript_to_db(final_transcript)
-                
-                # Run final processing
-                result = await run_final_processing(final_transcript)
-                
-                # Send final result to client
-                # Step 4: Create prescriptions from extracted entities
-                prescriptions = [
-                    Prescription(
-                        medication=entities["medication"],
-                        dosage=entities["dosage"],
-                        frequency=entities["frequency"],
-                        duration=entities["duration"]
-                    )
-                ]
-                
-                # Step 5: Assemble final response
-                final_response = ScribeAgentResponse(
-                    transcription=final_transcript,
-                    soap_note=soap_note,
-                    diagnosis=entities["diagnosis"],
-                    billing_code=billing_code,
-                    prescriptions=prescriptions,
-                    lab_orders=entities["lab_orders"]
-                )
-                
-                await websocket.send_json({
-                    "type": "final_result",
-                    "data": result
-                })
-        except Exception as e:
-            print(f"Error in handle_close: {e}")
-            await websocket.send_json({
-                "type": "error",
-                "message": f"Error processing final transcript: {str(e)}"
-            })
-    
-    try:
-        # Create AssemblyAI streaming client
-        client = aai.RealtimeTranscriber(
-            sample_rate=16000,
-            on_data=lambda data: asyncio.create_task(handle_partial_transcript_local(data)),
-            on_error=lambda error: asyncio.create_task(handle_error_local(error)),
-            on_close=lambda: asyncio.create_task(handle_close_local())
-        )
-        
-        # Connect to AssemblyAI
-        client.connect()
-        
-        async def handle_audio_stream():
-            """Handle incoming audio from client and send to AssemblyAI"""
-            try:
-                while True:
-                    # Receive audio data from client
-                    data = await websocket.receive_bytes()
-                    # Send to AssemblyAI streaming client
-                    client.stream(data)
-            except WebSocketDisconnect:
-                print("Client disconnected during audio streaming")
-                client.close()
-            except Exception as e:
-                print(f"Error in audio streaming: {e}")
-                client.close()
-        
-        # Start audio handling task
-        audio_task = asyncio.create_task(handle_audio_stream())
-        
-        # Wait for the audio task to complete
-        await audio_task
-        
-    except WebSocketDisconnect:
-        print("WebSocket disconnected")
-    except Exception as e:
-        print(f"WebSocket error: {e}")
-    finally:
-        print("Client disconnected")
-
 
 @app.websocket("/ws/transcription")
 async def transcription(websocket: WebSocket):
