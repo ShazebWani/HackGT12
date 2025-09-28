@@ -13,7 +13,7 @@ load_dotenv()
 # Path to the Mastra directory
 MASTRA_DIR = Path(__file__).parent.parent / "mastra"
 
-async def generate_soap_note(transcript: str) -> str:
+async def generate_soap_note(transcript: str, context_type: str = "general") -> str:
     """
     Generate a SOAP note from a given patient visit transcript using Mastra SOAP agent.
     
@@ -39,9 +39,9 @@ async def generate_soap_note(transcript: str) -> str:
             print("⚠️ OPENAI_API_KEY not found in environment variables")
             return _generate_fallback_soap_note(transcript)
         
-        # Call the Mastra script directly using tsx
+        # Call the Mastra script directly using tsx with context type
         result = subprocess.run(
-            ["npx", "tsx", "generate-soap.ts", transcript],
+            ["npx", "tsx", "generate-soap.ts", transcript, context_type],
             cwd=MASTRA_DIR,
             capture_output=True,
             text=True,
@@ -199,14 +199,9 @@ async def test_mastra_service():
         print("❌ Mastra setup is not correct")
         return False
     
-    # Test with sample transcript
-    test_transcript = """
-    Patient is a 45-year-old male here for a follow-up on his hypertension. 
-    He says he's been taking his lisinopril daily and has been checking his blood pressure, 
-    which is running about 130 over 80. No complaints of dizziness or side effects. 
-    Exam shows a BP of 128/82 and a heart rate of 70. Lungs are clear. 
-    We'll continue the current dose of lisinopril 10mg and see him back in 3 months.
-    """
+    # Import sample transcript from test fixtures
+    from test_fixtures.sample_transcripts import get_sample_transcript
+    test_transcript = get_sample_transcript("hypertension")
     
     try:
         soap_note = await generate_soap_note(test_transcript)

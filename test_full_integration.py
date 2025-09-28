@@ -20,14 +20,9 @@ async def test_full_integration():
         print("You can get an API key from: https://platform.openai.com/api-keys")
         return
     
-    # Sample medical transcript for testing
-    test_transcript = """
-    Patient is a 45-year-old male here for a follow-up on his hypertension. 
-    He says he's been taking his lisinopril daily and has been checking his blood pressure, 
-    which is running about 130 over 80. No complaints of dizziness or side effects. 
-    Exam shows a BP of 128/82 and a heart rate of 70. Lungs are clear. 
-    We'll continue the current dose of lisinopril 10mg and see him back in 3 months.
-    """
+    # Import sample transcript from test fixtures
+    from test_fixtures.sample_transcripts import get_sample_transcript
+    test_transcript = get_sample_transcript("hypertension")
     
     print("🧪 Testing Complete Audio to SOAP Note Integration...")
     print(f"📝 Test transcript: {test_transcript.strip()}")
