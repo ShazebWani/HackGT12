@@ -28,7 +28,12 @@ export const soapTool = createTool({
     lab_orders: z.array(z.string()).describe('Lab orders mentioned in transcript'),
   }),
   execute: async ({ context }) => {
-    // Pass the entire context object
+    // Validate that we have at least one source of medical information
+    if (!context.recordedTranscript && !context.uploadedDocuments && !context.doctorNotes) {
+      throw new Error('At least one medical information source must be provided');
+    }
+    
+    // Process the medical information through AI
     return await processMultipleSources(context);
   },
 });
@@ -54,31 +59,34 @@ Here is the hierarchy of authority:
 
 Your task is to fuse these sources. For example, if the transcript says "patient is worried about their blood sugar" and the uploaded document says "A1c is 8.2%", you must connect these facts in your output.
 
+CRITICAL: Extract REAL MEDICAL INFORMATION from the provided sources. Do NOT use generic placeholders like "Primary diagnosis" or "ICD-10 code". Use the actual medical information provided.
+
 You MUST output a valid JSON object with this EXACT structure:
 {
   "soap_note": {
-    "subjective": "Patient's complaints and symptoms",
-    "objective": "Vital signs, physical exam findings, lab results",
-    "assessment": "Clinical diagnosis and reasoning",
-    "plan": "Treatment plan, medications, follow-up"
+    "subjective": "Patient's actual complaints and symptoms from the data",
+    "objective": "Actual vital signs, physical exam findings, lab results from the data",
+    "assessment": "Actual clinical diagnosis and reasoning based on the data",
+    "plan": "Actual treatment plan, medications, follow-up based on the data"
   },
-  "diagnosis": "Primary diagnosis",
+  "diagnosis": "Actual primary diagnosis extracted from the data",
   "billing_code": {
-    "code": "ICD-10 code",
-    "description": "Code description"
+    "code": "Actual ICD-10 code for the diagnosis",
+    "description": "Actual code description"
   },
   "prescriptions": [
     {
-      "medication": "Medication name",
-      "dosage": "Dosage amount",
-      "frequency": "How often to take",
-      "duration": "How long to take"
+      "medication": "Actual medication name if mentioned",
+      "dosage": "Actual dosage if mentioned",
+      "frequency": "Actual frequency if mentioned",
+      "duration": "Actual duration if mentioned"
     }
   ],
-  "lab_orders": ["Lab test 1", "Lab test 2"]
+  "lab_orders": ["Actual lab tests mentioned"]
 }
 
 If no prescriptions or lab orders are mentioned, use empty arrays [].
+If information is not available in any source, write "Not provided" or "Not mentioned" rather than generic placeholders.
 `;
 
   // 3. COMBINE THE INPUTS into a single, clearly labeled context block for the AI
@@ -145,25 +153,32 @@ PLAN:
 ${structuredOutput.soap_note.plan || ''}
     `.trim();
 
-    return {
+    // Ensure the response matches the exact output schema
+    const result = {
       transcription: combinedContext, // Return the full context for reference
       soap_note: finalSoapNote,
       diagnosis: structuredOutput.diagnosis || "Unable to determine diagnosis",
-      billing_code: structuredOutput.billing_code || { code: 'N/A', description: 'Not specified' },
-      prescriptions: structuredOutput.prescriptions || [],
-      lab_orders: structuredOutput.lab_orders || [],
+      billing_code: structuredOutput.billing_code || { code: 'R69', description: 'Illness, unspecified' },
+      prescriptions: Array.isArray(structuredOutput.prescriptions) ? structuredOutput.prescriptions : [],
+      lab_orders: Array.isArray(structuredOutput.lab_orders) ? structuredOutput.lab_orders : [],
     };
+    
+    console.log('✅ SOAP tool returning structured result:', JSON.stringify(result, null, 2));
+    return result;
 
   } catch (error) {
     console.error("Error in multi-source processing:", error);
-    // Return a structured error response
-    return {
-      transcription: combinedContext,
-      soap_note: "Error processing clinical context.",
-      diagnosis: "Error",
-      billing_code: { code: 'Error', description: 'Error' },
+    // Return a structured error response that still allows the system to function
+    const errorResult = {
+      transcription: combinedContext || "Error retrieving context",
+      soap_note: `Error processing clinical context: ${error.message || error}`,
+      diagnosis: "Processing Error",
+      billing_code: { code: 'R69', description: 'Illness, unspecified - Processing Error' },
       prescriptions: [],
       lab_orders: [],
     };
+    
+    console.log('❌ SOAP tool returning error result:', JSON.stringify(errorResult, null, 2));
+    return errorResult;
   }
 };

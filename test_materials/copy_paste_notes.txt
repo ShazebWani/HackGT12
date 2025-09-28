@@ -1,0 +1,27 @@
+=== COPY-PASTE MEDICAL NOTES FOR TESTING ===
+
+SCENARIO 1 - HYPERTENSION FOLLOW-UP:
+45-year-old male here for T2DM follow-up. Taking metformin 1000 mg BID; home fasting BG ~140–160 mg/dL; no hypoglycemia, no polyuria/polydipsia/paresthesias. Also on lisinopril 10 mg daily and atorvastatin 20 mg daily; no side effects. Vitals today BP 135/85, HR 72, afebrile; lungs clear, RRR, no edema; feet with intact monofilament, no lesions. Last A1c 7.2% (↓ from 7.8%); Cr 1.0; LDL 95. Plan: continue current meds; order A1c/BMP/urine ACR today; reinforce diet/exercise; flu shot given; RTC 3 months; call if fasting BG >200 mg/dL for 3+ days; consider adding SGLT2 inhibitor if A1c remains >7%.
+SCENARIO 2 - DIABETES MANAGEMENT:
+55-year-old female with Type 2 diabetes presents for routine follow-up. She reports taking metformin 1000mg twice daily and checking her blood sugar regularly. Her last HbA1c was 7.5%. She's been experiencing some increased thirst and urination over the past month. Physical exam reveals blood pressure 140/90, weight 180 pounds. Blood glucose today is 185 mg/dL. We'll increase her metformin to 1000mg three times daily and add glipizide 5mg daily. She'll return in 6 weeks for repeat labs.
+
+SCENARIO 3 - CHEST PAIN EVALUATION:
+62-year-old male presents with chest pain that started 2 hours ago. He describes it as pressure-like, 7/10 severity, radiating to left arm. Associated with diaphoresis and nausea. No shortness of breath. Past medical history significant for hypertension and smoking. Vital signs: BP 150/95, HR 88, RR 18, O2 sat 98% on room air. EKG shows ST elevation in leads II, III, and aVF. Troponin elevated at 2.5. We're calling cardiology for immediate evaluation and starting aspirin 325mg, atorvastatin 80mg, and metoprolol 25mg twice daily.
+
+SCENARIO 4 - ROUTINE PHYSICAL:
+30-year-old female presents for annual physical examination. No acute complaints. She exercises regularly and maintains a healthy diet. Vital signs normal: BP 110/70, HR 65, weight 130 pounds. Physical exam unremarkable. Labs ordered: CBC, CMP, lipid panel, TSH. She's due for Pap smear and mammogram. Will schedule follow-up in 1 year.
+
+SCENARIO 5 - RESPIRATORY INFECTION:
+28-year-old male presents with cough, congestion, and low-grade fever for 3 days. He reports feeling tired and having a sore throat. No chest pain or shortness of breath. Physical exam shows mild pharyngeal erythema, clear lungs, no lymphadenopathy. Temperature 100.2°F. Rapid strep test negative. Prescribed symptomatic care with rest, fluids, and acetaminophen for fever. Return if symptoms worsen or persist beyond 7 days.
+
+=== INSTRUCTIONS ===
+1. Copy any of the above scenarios
+2. Paste into the text input field in your application
+3. Select appropriate context type (general, medical_notes, etc.)
+4. Process and verify the generated SOAP note contains:
+   - Proper subjective information
+   - Objective findings
+   - Assessment/diagnosis
+   - Treatment plan
+   - Prescriptions (if mentioned)
+   - Billing codes

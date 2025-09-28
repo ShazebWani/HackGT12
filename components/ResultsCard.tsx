@@ -94,14 +94,7 @@ export default function ResultsCard({ results }: ResultsCardPropsExtended) {
             <h4 className="text-lg font-semibold text-accent-1">Prescriptions</h4>
           </div>
           
-          {/* Debug information */}
-          <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded text-sm">
-            <strong>Debug Info:</strong><br/>
-            Prescriptions exists: {results.prescriptions ? 'Yes' : 'No'}<br/>
-            Prescriptions type: {typeof results.prescriptions}<br/>
-            Prescriptions length: {results.prescriptions?.length || 'N/A'}<br/>
-            Prescriptions content: {JSON.stringify(results.prescriptions)}
-          </div>
+          
           
           <div className="space-y-3">
             {results.prescriptions && results.prescriptions.length > 0 ? (
@@ -134,14 +127,7 @@ export default function ResultsCard({ results }: ResultsCardPropsExtended) {
             <h4 className="text-lg font-semibold text-accent-1">Lab Orders</h4>
           </div>
           
-          {/* Debug information */}
-          <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded text-sm">
-            <strong>Debug Info:</strong><br/>
-            Lab orders exists: {results.lab_orders ? 'Yes' : 'No'}<br/>
-            Lab orders type: {typeof results.lab_orders}<br/>
-            Lab orders length: {results.lab_orders?.length || 'N/A'}<br/>
-            Lab orders content: {JSON.stringify(results.lab_orders)}
-          </div>
+          
           
           <div className="space-y-2">
             {results.lab_orders && results.lab_orders.length > 0 ? (

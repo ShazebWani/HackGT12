@@ -7,44 +7,56 @@ import { soapAgent } from './mastra/agents/soap-agent';
 config({ path: '../.env' }); // Load from parent directory
 config(); // Also try current directory
 
-async function generateSOAPNote(transcript: string, contextType?: string) {
+async function generateSOAPNoteWithContext(
+  recordedTranscript?: string, 
+  uploadedDocuments?: string, 
+  doctorNotes?: string
+) {
   try {
-    // Enhance the prompt based on context type
-    let enhancedPrompt = `Please use the soapTool to process this medical information and return the complete structured medical data: ${transcript}`;
-    
-    if (contextType) {
-      switch (contextType.toLowerCase()) {
-        case 'medical_notes':
-          enhancedPrompt = `Please use the soapTool to process these medical notes and generate appropriate SOAP documentation, diagnoses, and treatment plans: ${transcript}`;
-          break;
-        case 'patient_history':
-          enhancedPrompt = `Please use the soapTool to process this patient history information and generate relevant medical documentation: ${transcript}`;
-          break;
-        case 'symptoms':
-          enhancedPrompt = `Please use the soapTool to process these patient symptoms and generate appropriate medical assessment and treatment plans: ${transcript}`;
-          break;
-        case 'lab_results':
-          enhancedPrompt = `Please use the soapTool to process these lab results and generate appropriate medical interpretation and follow-up plans: ${transcript}`;
-          break;
-        default:
-          enhancedPrompt = `Please use the soapTool to process this medical information and return the complete structured medical data: ${transcript}`;
-      }
+    // Build the tool parameters object
+    const toolParams: any = {};
+    if (recordedTranscript && recordedTranscript.trim()) {
+      toolParams.recordedTranscript = recordedTranscript;
     }
+    if (uploadedDocuments && uploadedDocuments.trim()) {
+      toolParams.uploadedDocuments = uploadedDocuments;
+    }
+    if (doctorNotes && doctorNotes.trim()) {
+      toolParams.doctorNotes = doctorNotes;
+    }
+
+    // Create the prompt to use the tool with the structured parameters
+    const prompt = `Please use the generate-soap-note tool with the following parameters: ${JSON.stringify(toolParams)}`;
 
     // Use the SOAP agent to generate structured medical data
     const response = await soapAgent.generate([
       {
         role: 'user',
-        content: enhancedPrompt
+        content: prompt
       }
     ]);
 
+    // The agent should return the tool's JSON output
     // Try to parse the response as JSON first
     try {
       const jsonData = JSON.parse(response.text);
       return JSON.stringify(jsonData, null, 2);
-    } catch {
-      // If not JSON, return the text response
+    } catch (parseError) {
+      console.error('❌ Failed to parse agent response as JSON:', parseError);
+      console.error('❌ Raw response:', response.text);
+      
+      // Fallback: try to extract JSON from the response text
+      const jsonMatch = response.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const extractedJson = JSON.parse(jsonMatch[0]);
+          return JSON.stringify(extractedJson, null, 2);
+        } catch {
+          // Still couldn't parse, return original response
+          return response.text;
+        }
+      }
+      
       return response.text;
     }
 
@@ -56,16 +68,49 @@ async function generateSOAPNote(transcript: string, contextType?: string) {
 
 // Handle command line usage
 async function main() {
-  const transcript = process.argv[2];
-  const contextType = process.argv[3] || 'general';
+  const args = process.argv.slice(2);
   
-  if (!transcript) {
-    console.error('Usage: tsx generate-soap.ts "medical transcript here" [context_type]');
+  // Parse arguments - support both old format and new structured format
+  let recordedTranscript = '';
+  let uploadedDocuments = '';
+  let doctorNotes = '';
+  
+  // Check if we have the new structured arguments
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--recordedTranscript' && i + 1 < args.length) {
+      recordedTranscript = args[i + 1];
+      i++; // Skip the next argument as it's the value
+    } else if (args[i] === '--uploadedDocuments' && i + 1 < args.length) {
+      uploadedDocuments = args[i + 1];
+      i++; // Skip the next argument as it's the value
+    } else if (args[i] === '--doctorNotes' && i + 1 < args.length) {
+      doctorNotes = args[i + 1];
+      i++; // Skip the next argument as it's the value
+    } else if (!args[i].startsWith('--')) {
+      // Legacy format - first non-flag argument is treated as transcript
+      if (!recordedTranscript) {
+        recordedTranscript = args[i];
+      }
+    }
+  }
+  
+  // Check if we have any content
+  if (!recordedTranscript && !uploadedDocuments && !doctorNotes) {
+    console.error('Usage: tsx generate-soap.ts [--recordedTranscript "transcript"] [--uploadedDocuments "documents"] [--doctorNotes "notes"]');
+    console.error('   OR: tsx generate-soap.ts "medical transcript here" [context_type] (legacy format)');
     process.exit(1);
   }
   
   try {
-    const soapNote = await generateSOAPNote(transcript, contextType);
+    let soapNote;
+    if (recordedTranscript || uploadedDocuments || doctorNotes) {
+      // Use the new structured format
+      soapNote = await generateSOAPNoteWithContext(recordedTranscript, uploadedDocuments, doctorNotes);
+    } else {
+      // Fallback to legacy format
+      soapNote = await generateSOAPNote(recordedTranscript, 'general');
+    }
+    
     console.log('\n📋 Generated SOAP Note:');
     console.log('='.repeat(50));
     console.log(soapNote);
@@ -77,7 +122,7 @@ async function main() {
 }
 
 // Export for programmatic use
-export { generateSOAPNote };
+export { generateSOAPNote, generateSOAPNoteWithContext };
 
 // Run if called directly
 if (require.main === module) {

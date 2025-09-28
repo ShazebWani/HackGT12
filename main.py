@@ -11,7 +11,7 @@ import json
 from datetime import datetime
 from dotenv import load_dotenv
 from database import database, transcripts, patients
-from agents.mastra_soap_agent import generate_soap_note
+from agents.mastra_soap_agent import generate_soap_note, generate_soap_note_with_context
 import pdfplumber
 import PyPDF2
 import io
@@ -556,22 +556,31 @@ async def process_text_context(request: TextContextRequest):
 @app.post("/api/process-pdf", response_model=ScribeAgentResponse)
 async def process_pdf_file(file: UploadFile = File(...)):
     """
-    Process PDF file and extract text, then process through SOAP agent
+    Process PDF or text file and extract text, then process through SOAP agent
     """
     try:
-        # Validate file type
-        if not file.content_type == "application/pdf" and not file.filename.endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="File must be a PDF")
+        # Validate file type - accept both PDF and text files
+        if not (file.content_type in ["application/pdf", "text/plain"] or 
+                file.filename.endswith(('.pdf', '.txt'))):
+            raise HTTPException(status_code=400, detail="File must be a PDF or text file")
         
         # Read file content
         file_content = await file.read()
         
-        # Extract text from PDF
-        print(f"📄 Extracting text from PDF: {file.filename}")
-        extracted_text = extract_text_from_pdf(file_content)
+        # Extract text based on file type
+        if file.content_type == "application/pdf" or file.filename.endswith('.pdf'):
+            print(f"📄 Extracting text from PDF: {file.filename}")
+            extracted_text = extract_text_from_pdf(file_content)
+        else:
+            # Text file
+            print(f"📝 Reading text file: {file.filename}")
+            try:
+                extracted_text = file_content.decode('utf-8')
+            except UnicodeDecodeError:
+                raise HTTPException(status_code=400, detail="Unable to decode text file. Please ensure it's UTF-8 encoded.")
         
         if not extracted_text.strip():
-            raise HTTPException(status_code=400, detail="No text could be extracted from PDF")
+            raise HTTPException(status_code=400, detail="No text could be extracted from file")
         
         print(f"📄 Extracted text length: {len(extracted_text)} characters")
         
@@ -684,7 +693,7 @@ async def process_multiple_files(files: List[UploadFile] = File(...)):
         print(f"📝 Combined text length: {len(combined_text)} characters from {len(all_texts)} files")
         
         # Process the combined text through SOAP agent
-        medical_data = await run_final_processing_with_context(combined_text, "multiple_documents")
+        medical_data = await run_final_processing_with_context(combined_text, "medical_document")
         
         # Check if we got structured JSON data from Mastra
         if isinstance(medical_data, dict) and 'error' not in medical_data:
@@ -745,11 +754,11 @@ async def save_transcript_to_db(text: str):
     except Exception as e:
         print(f"Error saving transcript to database: {e}")
 
-async def run_final_processing(transcript: str) -> dict:
-    """Run final processing on the complete transcript"""
+async def run_final_processing(transcript: str, uploaded_documents: str = "", doctor_notes: str = "") -> dict:
+    """Run final processing on the complete transcript with additional context"""
     try:
-        # Generate structured medical data using Mastra SOAP agent
-        mastra_result = await generate_soap_note(transcript)
+        # Generate structured medical data using Mastra SOAP agent with all context
+        mastra_result = await generate_soap_note_with_context(transcript, uploaded_documents, doctor_notes)
         
         # Check if we got structured JSON data from Mastra
         if isinstance(mastra_result, dict):
@@ -925,12 +934,22 @@ async def transcription(websocket: WebSocket):
     # State variable to track if final result has been sent
     final_result_sent = False # <-- New state tracker
 
+    # Store additional context from the client
+    additional_context = {"uploaded_documents": "", "doctor_notes": ""}
+
     def on_final_cb(full_text: str):
         print("on_final_cb")
         try:
             print("Processing final transcript with SOAP agent...")
-            # Process the transcript through SOAP agent
-            asyncio.run_coroutine_threadsafe(process_transcript_with_soap(full_text.strip()), loop)
+            # Process the transcript through SOAP agent with additional context
+            asyncio.run_coroutine_threadsafe(
+                process_transcript_with_soap(
+                    full_text.strip(), 
+                    additional_context.get("uploaded_documents", ""),
+                    additional_context.get("doctor_notes", "")
+                ), 
+                loop
+            )
             
         except Exception as e:
             print(f"Error in on_final_cb: {e}")
@@ -941,13 +960,14 @@ async def transcription(websocket: WebSocket):
                 "is_final": True
             })
 
-    async def process_transcript_with_soap(transcript: str):
+    async def process_transcript_with_soap(transcript: str, uploaded_documents: str = "", doctor_notes: str = ""):
         """Process transcript through SOAP agent and send results"""
         try:
             print(f"🤖 Processing transcript with SOAP agent: {transcript[:100]}...")
+            print(f"📄 Additional context - Documents: {len(uploaded_documents)} chars, Notes: {len(doctor_notes)} chars")
             
-            # Run final processing with SOAP agent
-            medical_data = await run_final_processing(transcript)
+            # Run final processing with SOAP agent including all context
+            medical_data = await run_final_processing(transcript, uploaded_documents, doctor_notes)
             
             print(f"📋 SOAP agent generated medical data: {medical_data.keys() if isinstance(medical_data, dict) else 'Not a dict'}")
             print(f"📋 Medical data structure: {medical_data}")
@@ -997,6 +1017,16 @@ async def transcription(websocket: WebSocket):
                     data = json.loads(text)
                     if data.get("type") == "END_OF_STREAM":
                         print("Received END_OF_STREAM from client. Setting stop event.")
+                        
+                        # Check for additional context in the END_OF_STREAM message
+                        if "uploaded_documents" in data:
+                            additional_context["uploaded_documents"] = data["uploaded_documents"]
+                            print(f"📄 Received uploaded documents: {len(data['uploaded_documents'])} characters")
+                        
+                        if "doctor_notes" in data:
+                            additional_context["doctor_notes"] = data["doctor_notes"]
+                            print(f"📝 Received doctor notes: {len(data['doctor_notes'])} characters")
+                        
                         stop_event.set()
                 except WebSocketDisconnect:
                     print("Client disconnected (recv)")

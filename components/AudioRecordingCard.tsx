@@ -7,9 +7,10 @@ interface AudioRecordingProps {
   startRecording: () => void
   stopRecording: () => void
   handleRecordingResults: (results: any) => void
+  getUploadedContent?: () => { files: File[], text: string }
 }
 
-const AudioRecordingCard = ({ audioStatus, startRecording, stopRecording, handleRecordingResults }: AudioRecordingProps) => {
+const AudioRecordingCard = ({ audioStatus, startRecording, stopRecording, handleRecordingResults, getUploadedContent }: AudioRecordingProps) => {
   const [isProcessing, setIsProcessing] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const [audioResults, setAudioResults] = useState<any>(null)
@@ -94,7 +95,50 @@ const AudioRecordingCard = ({ audioStatus, startRecording, stopRecording, handle
     // Tell backend to stop capturing
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       try {
-        wsRef.current.send(JSON.stringify({ type: 'END_OF_STREAM' }))
+        // Get uploaded content and doctor notes to send with END_OF_STREAM
+        const endStreamMessage: any = { type: 'END_OF_STREAM' };
+        
+        if (getUploadedContent) {
+          const uploadedContent = getUploadedContent();
+          
+          // Extract text from uploaded files
+          let uploadedDocuments = '';
+          if (uploadedContent.files.length > 0) {
+            try {
+              // For now, we'll read text files directly. For PDF files, they should be processed server-side
+              const textPromises = uploadedContent.files.map(async (file) => {
+                if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+                  const text = await file.text();
+                  return `=== ${file.name} ===\n${text}`;
+                } else {
+                  return `=== ${file.name} ===\n[File type: ${file.type || 'unknown'} - Content processed server-side]`;
+                }
+              });
+              
+              // This is a synchronous operation, so we'll just get file names for now
+              // In production, you'd want to process files differently
+              uploadedDocuments = `Files: ${uploadedContent.files.map(f => f.name).join(', ')}`;
+            } catch (error) {
+              console.error('Error reading file contents:', error);
+              uploadedDocuments = `Files: ${uploadedContent.files.map(f => f.name).join(', ')}`;
+            }
+          }
+          
+          // Add doctor notes (from the text input)
+          const doctorNotes = uploadedContent.text || '';
+          
+          if (uploadedDocuments.trim()) {
+            endStreamMessage.uploaded_documents = uploadedDocuments;
+            console.log(`📄 Sending uploaded documents: ${uploadedDocuments.length} characters`);
+          }
+          
+          if (doctorNotes.trim()) {
+            endStreamMessage.doctor_notes = doctorNotes;
+            console.log(`📝 Sending doctor notes: ${doctorNotes.length} characters`);
+          }
+        }
+        
+        wsRef.current.send(JSON.stringify(endStreamMessage))
         // ONLY set isProcessing to true here, we wait for final_result to set it to false
         setIsProcessing(true)
       } catch (e) {

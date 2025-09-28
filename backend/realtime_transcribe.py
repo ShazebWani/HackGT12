@@ -42,7 +42,7 @@ class AudioTranscribe:
         try:
             with open(tmp_path, "rb") as f:
                 resp = self.client.audio.transcriptions.create(
-                    model="gpt-4o-transcribe", file=f, language="en"  # <-- force English transcription
+                    model="whisper-1", file=f, language="en"  # <-- force English transcription
                 )
 
             return getattr(resp, "text", None)
@@ -72,15 +72,16 @@ class AudioTranscribe:
                     if stop_event is not None and stop_event.is_set():
                         print("Stop event set, stopping transcriber loop.")
                         break
-                    # Check whether the user pressed Esc to stop recording
+                    # Check whether the user pressed Esc to stop recording (Windows only)
                     try:
+                        import msvcrt
                         if msvcrt.kbhit():
                             key = msvcrt.getch()
                             if key == b"\x1b":
                                 print("Esc pressed, stopping.")
                                 break
-                    except Exception:
-                        # Non-fatal if key check fails for some reason
+                    except (ImportError, Exception):
+                        # Non-fatal if key check fails or msvcrt not available (non-Windows)
                         pass
 
                     if stop_event is not None and stop_event.is_set():

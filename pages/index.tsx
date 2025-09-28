@@ -21,6 +21,9 @@ export default function Home() {
   // Audio recorder state
   const [audioStatus, setAudioStatus] = useState<'idle' | 'recording'>('idle')
   
+  // File upload state
+  const [getUploadedContent, setGetUploadedContent] = useState<(() => { files: File[], text: string }) | null>(null)
+  
   // Patient context
   const { state, activePatient, addMedicalRecord } = usePatient()
 
@@ -34,7 +37,7 @@ export default function Home() {
     setIsProcessing(true)
   }
 
-  const handleRecordingResults = useCallback((recordingResults: any) => {
+  const handleRecordingResults = useCallback(async (recordingResults: any) => {
     if (!recordingResults) {
       return;
     }
@@ -44,6 +47,54 @@ export default function Home() {
     console.log("🔍 Has soap_note:", !!recordingResults.soap_note);
     console.log("🔍 Has prescriptions:", !!recordingResults.prescriptions);
     console.log("🔍 Has lab_orders:", !!recordingResults.lab_orders);
+
+    // Check if we have uploaded files or text to combine
+    const uploadedContent = getUploadedContent ? getUploadedContent() : { files: [], text: '' };
+    const hasUploadedContent = uploadedContent.files.length > 0 || uploadedContent.text.trim().length > 0;
+
+    if (hasUploadedContent) {
+      console.log("📁 Combining audio transcription with uploaded content");
+      console.log("📁 Files:", uploadedContent.files.length);
+      console.log("📁 Text length:", uploadedContent.text.length);
+      
+      // Combine audio transcription with uploaded content
+      let combinedText = recordingResults.transcription || '';
+      
+      if (uploadedContent.text.trim()) {
+        combinedText += `\n\n--- ADDITIONAL NOTES ---\n${uploadedContent.text}`;
+      }
+      
+      if (uploadedContent.files.length > 0) {
+        combinedText += `\n\n--- UPLOADED DOCUMENTS ---\n`;
+        // For now, we'll process files separately, but in a real implementation,
+        // you'd extract text from files here
+        combinedText += `(${uploadedContent.files.length} files uploaded)`;
+      }
+      
+      // Process the combined content
+      try {
+        const response = await fetch('/api/process-text-context', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: combinedText,
+            context_type: 'combined_audio_and_documents'
+          })
+        });
+        
+        if (response.ok) {
+          const combinedResults = await response.json();
+          console.log("✅ Combined processing successful:", combinedResults);
+          setResults(combinedResults);
+          setIsProcessing(false);
+          return;
+        }
+      } catch (error) {
+        console.error("❌ Error processing combined content:", error);
+      }
+    }
 
     // Check if we have structured medical data from SOAP agent
     if (recordingResults.transcription && recordingResults.soap_note) {
@@ -58,7 +109,7 @@ export default function Home() {
       setIsAudio(text);
       setIsProcessing(!recordingResults.isFinal);
     }
-  }, []);
+  }, [getUploadedContent]);
 
   // Track results state changes
   useEffect(() => {
@@ -101,6 +152,10 @@ export default function Home() {
       setResults(results);
       setIsProcessing(false);
     }
+  }, []);
+
+  const handleGetUploadedContent = useCallback((getContent: () => { files: File[], text: string }) => {
+    setGetUploadedContent(() => getContent);
   }, []);
 
 
@@ -202,11 +257,13 @@ export default function Home() {
                       startRecording={startRecording}
                       stopRecording={stopRecording}
                       handleRecordingResults={handleRecordingResults}
+                      getUploadedContent={getUploadedContent || undefined}
                     />
                     
                     <TextFileUploadCard 
                       onFileUpload={handleTextFileUpload}
                       onTextContextProcessed={handleTextContextProcessed}
+                      onGetUploadedContent={handleGetUploadedContent}
                     />
                   </div>
                 </div>

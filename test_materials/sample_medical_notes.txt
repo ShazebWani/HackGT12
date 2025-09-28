@@ -1,0 +1,54 @@
+PATIENT: John Smith, MRN: 12345
+DATE: December 15, 2024
+PHYSICIAN: Dr. Sarah Johnson
+
+CHIEF COMPLAINT:
+Follow-up visit for diabetes management
+
+HISTORY OF PRESENT ILLNESS:
+45-year-old male with Type 2 diabetes mellitus, diagnosed 3 years ago. Patient reports good adherence to metformin 1000mg twice daily. Blood glucose monitoring shows average fasting glucose of 140-160 mg/dL. No episodes of hypoglycemia. Patient denies polyuria, polydipsia, or polyphagia. No visual changes or numbness in extremities.
+
+MEDICATIONS:
+- Metformin 1000mg PO BID
+- Lisinopril 10mg PO daily (for hypertension)
+- Atorvastatin 20mg PO daily
+
+VITAL SIGNS:
+Blood Pressure: 135/85 mmHg
+Heart Rate: 72 bpm
+Temperature: 98.6°F
+Weight: 185 lbs (stable)
+Height: 5'10"
+
+PHYSICAL EXAMINATION:
+General: Well-appearing, no acute distress
+HEENT: Normal
+Cardiovascular: Regular rate and rhythm, no murmurs
+Pulmonary: Clear to auscultation bilaterally
+Extremities: No edema, pulses intact
+Neurological: No focal deficits
+
+LABORATORY RESULTS (from last visit):
+- HbA1c: 7.2% (down from 7.8% 3 months ago)
+- Fasting glucose: 145 mg/dL
+- Creatinine: 1.0 mg/dL
+- LDL cholesterol: 95 mg/dL
+
+ASSESSMENT AND PLAN:
+1. Type 2 diabetes mellitus - improved control
+   - Continue current metformin regimen
+   - Consider adding SGLT2 inhibitor if HbA1c remains >7%
+   - Follow up in 3 months with repeat HbA1c
+
+2. Hypertension - well controlled
+   - Continue lisinopril
+   - Monitor blood pressure
+
+3. Hyperlipidemia - well controlled
+   - Continue atorvastatin
+   - Repeat lipid panel in 6 months
+
+FOLLOW-UP:
+- Return in 3 months
+- Continue home glucose monitoring
+- Call if blood glucose consistently >200 mg/dL

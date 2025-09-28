@@ -13,6 +13,108 @@ load_dotenv()
 # Path to the Mastra directory
 MASTRA_DIR = Path(__file__).parent.parent / "mastra"
 
+async def generate_soap_note_with_context(recorded_transcript: str = "", uploaded_documents: str = "", doctor_notes: str = "") -> str:
+    """
+    Generate a SOAP note from multiple medical information sources using Mastra SOAP agent.
+    
+    Args:
+        recorded_transcript (str): The patient visit transcript or dictation
+        uploaded_documents (str): Text from uploaded medical documents, labs, etc.
+        doctor_notes (str): Direct physician notes or instructions
+        
+    Returns:
+        str or dict: The generated SOAP note data structure or fallback string.
+        
+    Raises:
+        Exception: If the Mastra agent fails to generate the SOAP note.
+    """
+    try:
+        # Check if we have at least one source of information
+        if not any([recorded_transcript.strip(), uploaded_documents.strip(), doctor_notes.strip()]):
+            raise ValueError("At least one medical information source must be provided")
+        
+        # Prepare environment variables - inherit current env and ensure OPENAI_API_KEY is passed
+        env = os.environ.copy()
+        
+        # Check if OPENAI_API_KEY is available
+        if not env.get("OPENAI_API_KEY"):
+            print("⚠️ OPENAI_API_KEY not found in environment variables")
+            return _generate_fallback_soap_note(recorded_transcript or uploaded_documents or doctor_notes)
+        
+        # Format the inputs as the SOAP tool expects them
+        context_args = []
+        if recorded_transcript.strip():
+            context_args.extend(["--recordedTranscript", recorded_transcript])
+        if uploaded_documents.strip():
+            context_args.extend(["--uploadedDocuments", uploaded_documents])
+        if doctor_notes.strip():
+            context_args.extend(["--doctorNotes", doctor_notes])
+        
+        # Call the Mastra script with the structured context
+        result = subprocess.run(
+            ["npx", "tsx", "generate-soap.ts"] + context_args,
+            cwd=MASTRA_DIR,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env  # Pass environment variables explicitly
+        )
+        
+        if result.returncode == 0:
+            # Extract the SOAP note from the output
+            output_lines = result.stdout.strip().split('\n')
+            
+            # Find the SOAP note content between the markers
+            soap_start = -1
+            soap_end = -1
+            found_first_separator = False
+            
+            for i, line in enumerate(output_lines):
+                if '📋 Generated SOAP Note:' in line:
+                    # Look for the next line with equals signs (separator)
+                    for j in range(i + 1, len(output_lines)):
+                        if '==' in output_lines[j]:
+                            soap_start = j + 1
+                            found_first_separator = True
+                            break
+                elif '==' in line and found_first_separator and soap_start > -1 and i > soap_start:
+                    soap_end = i
+                    break
+            
+            if soap_start > -1 and soap_end > -1:
+                soap_content = '\n'.join(output_lines[soap_start:soap_end])
+                
+                # Look for JSON content within the output
+                json_data = extract_json_from_content(soap_content)
+                if json_data:
+                    print(f"✅ Successfully extracted JSON from Mastra agent: {json_data}")
+                    return json_data
+                
+                # If not JSON, return as SOAP note string
+                return soap_content.strip()
+            else:
+                # If we can't find markers, try to extract JSON from full output
+                print(f"🔍 No markers found, searching full output for JSON...")
+                json_data = extract_json_from_content(result.stdout)
+                if json_data:
+                    print(f"✅ Successfully extracted JSON from full output: {json_data}")
+                    return json_data
+                
+                # As last resort, look for any JSON-like content in the entire output
+                print(f"🔍 Full Mastra output:\n{result.stdout}")
+                return result.stdout.strip() if result.stdout.strip() else _generate_fallback_soap_note(recorded_transcript or uploaded_documents or doctor_notes)
+        
+        else:
+            # Mastra script failed, fall back to generating a fallback SOAP note
+            print(f"❌ Mastra script failed with return code {result.returncode}")
+            print(f"❌ Error output: {result.stderr}")
+            return _generate_fallback_soap_note(recorded_transcript or uploaded_documents or doctor_notes)
+        
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, Exception) as e:
+        # Any error with Mastra agent, fall back gracefully
+        print(f"❌ Exception in generate_soap_note_with_context: {e}")
+        return _generate_fallback_soap_note(recorded_transcript or uploaded_documents or doctor_notes)
+
 async def generate_soap_note(transcript: str, context_type: str = "general") -> str:
     """
     Generate a SOAP note from a given patient visit transcript using Mastra SOAP agent.
@@ -76,20 +178,22 @@ async def generate_soap_note(transcript: str, context_type: str = "general") -> 
                 # Look for JSON content within the output
                 json_data = extract_json_from_content(soap_content)
                 if json_data:
+                    print(f"✅ Successfully extracted JSON from Mastra agent: {json_data}")
                     return json_data
                 
                 # If not JSON, return as SOAP note string
                 return soap_content.strip()
             else:
-                # If we can't find markers, check if we have any meaningful output
-                if result.stdout.strip():
-                    # Try to extract JSON from full output
-                    json_data = extract_json_from_content(result.stdout)
-                    if json_data:
-                        return json_data
-                    return result.stdout.strip()
-                else:
-                    return _generate_fallback_soap_note(transcript)
+                # If we can't find markers, try to extract JSON from full output
+                print(f"🔍 No markers found, searching full output for JSON...")
+                json_data = extract_json_from_content(result.stdout)
+                if json_data:
+                    print(f"✅ Successfully extracted JSON from full output: {json_data}")
+                    return json_data
+                
+                # As last resort, look for any JSON-like content in the entire output
+                print(f"🔍 Full Mastra output:\n{result.stdout}")
+                return result.stdout.strip() if result.stdout.strip() else _generate_fallback_soap_note(transcript)
         
         else:
             # Mastra script failed, fall back to generating a fallback SOAP note
@@ -100,10 +204,11 @@ async def generate_soap_note(transcript: str, context_type: str = "general") -> 
         return _generate_fallback_soap_note(transcript)
 
 def extract_json_from_content(content: str) -> Optional[dict]:
-    """Extract JSON data from content that may contain markdown code blocks"""
+    """Extract JSON data from content that may contain markdown code blocks or mixed text"""
     try:
         # First try to parse the content directly as JSON
-        return json.loads(content.strip())
+        cleaned_content = content.strip()
+        return json.loads(cleaned_content)
     except json.JSONDecodeError:
         pass
     
@@ -124,8 +229,9 @@ def extract_json_from_content(content: str) -> Optional[dict]:
             # Find the end by counting braces
             brace_count = 0
             for j in range(i, len(lines)):
-                brace_count += lines[j].count('{') - lines[j].count('}')
-                if brace_count == 0 and '{' in lines[j]:
+                line_text = lines[j]
+                brace_count += line_text.count('{') - line_text.count('}')
+                if brace_count == 0 and '{' in line_text:
                     json_end = j + 1
                     break
             break
@@ -136,6 +242,21 @@ def extract_json_from_content(content: str) -> Optional[dict]:
             return json.loads(json_text)
         except json.JSONDecodeError:
             pass
+    
+    # As last resort, try to find any JSON-like object in the content using regex
+    import re
+    json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+    matches = re.findall(json_pattern, content, re.DOTALL)
+    
+    for match in matches:
+        try:
+            # Try to parse each potential JSON match
+            result = json.loads(match)
+            # Validate it looks like our expected structure
+            if isinstance(result, dict) and ('soap_note' in result or 'transcription' in result):
+                return result
+        except json.JSONDecodeError:
+            continue
     
     return None
 
