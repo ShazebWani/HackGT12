@@ -371,7 +371,7 @@ const TextFileUploadCard: React.FC<TextFileUploadProps> = ({
                 </div>
 
                 {/* Files List in Compact Column Layout */}
-                <div className="flex-1 mt-4 border-2 border-accent-1/20 rounded-lg bg-white/50 backdrop-blur-sm">
+                <div className="flex-1 mt-4 border-2 border-accent-1/20 rounded-lg backdrop-blur-sm">
                   <div className="p-4 h-full flex flex-col">
                     <div className="flex items-center gap-2 mb-3">
                       <FileIcon className="h-5 w-5 text-accent-1" />
@@ -385,7 +385,7 @@ const TextFileUploadCard: React.FC<TextFileUploadProps> = ({
                         {uploadedFiles.map((uploadedFile) => (
                           <div
                             key={uploadedFile.id}
-                            className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-accent-1/30 transition-all duration-200"
+                            className="flex items-center justify-between p-3 bg-accent-2/10 border border-gray-200 rounded-lg hover:border-accent-1/30 transition-all duration-200"
                           >
                             <div className="flex items-center space-x-3 min-w-0 flex-1">
                               <FileIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
