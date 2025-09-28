@@ -1,4 +1,5 @@
-import { FileText, Pill, TestTube, CreditCard, User } from 'lucide-react'
+import { FileText, Pill, TestTube, CreditCard, User, Check } from 'lucide-react'
+import { useState } from 'react'
 
 interface ResultsCardProps {
   results: {
@@ -24,6 +25,8 @@ interface ResultsCardPropsExtended extends ResultsCardProps {
 }
 
 export default function ResultsCard({ results }: ResultsCardPropsExtended) {
+  const [isApproved, setIsApproved] = useState(false);
+  
   if (!results) {
     return null;
   }
@@ -34,6 +37,12 @@ export default function ResultsCard({ results }: ResultsCardPropsExtended) {
   console.log("🔍 Lab orders data:", results.lab_orders);
   console.log("🔍 Prescriptions length:", results.prescriptions?.length);
   console.log("🔍 Lab orders length:", results.lab_orders?.length);
+
+  const handleApproveAndSign = () => {
+    setIsApproved(true);
+    // Here you could also add API call to save the record to backend
+    console.log("📝 Record approved and signed");
+  };
 
   return (
     <div className="medical-card w-full mt-8">
@@ -149,11 +158,23 @@ export default function ResultsCard({ results }: ResultsCardPropsExtended) {
 
         {/* Action Buttons */}
         <div className="flex space-x-4 pt-6 border-t border-accent-1/20">
-          <button className="flex-1 bg-accent-1 hover:bg-accent-1/90 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200  ">
-            Approve & Sign
-          </button>
-          <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-lg transition-colors duration-200  ">
-            Edit & Review
+          <button 
+            onClick={handleApproveAndSign}
+            disabled={isApproved}
+            className={`flex-1 font-semibold py-3 px-6 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+              isApproved 
+                ? 'bg-accent-2 text-white cursor-default' 
+                : 'bg-accent-1 hover:bg-accent-1/90 text-white hover:scale-[1.02]'
+            }`}
+          >
+            {isApproved ? (
+              <>
+                <Check className="h-5 w-5" />
+                Record Saved Successfully
+              </>
+            ) : (
+              'Approve & Sign'
+            )}
           </button>
         </div>
       </div>

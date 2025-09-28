@@ -291,132 +291,139 @@ const TextFileUploadCard: React.FC<TextFileUploadProps> = ({
           }`}
         >
           <div className="h-full flex flex-col">
-            {/* Upload Area */}
-            <div
-              onDrop={handleDrop}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onClick={openFilePicker}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") openFilePicker();
-              }}
-              className={`${uploadedFiles.length > 0 ? 'min-h-[200px]' : 'flex-1'} border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 flex flex-col items-center justify-center ${
-                dragOver ? "border-accent-1 bg-accent-1/5" : "border-gray-300 hover:border-accent-1/50"
-              }`}
-            >
-              <Upload className={`h-16 w-16 mx-auto mb-6 ${dragOver ? "text-accent-1" : "text-gray-400"}`} />
+            {uploadedFiles.length === 0 ? (
+              /* Empty State - Full Drag & Drop Interface */
+              <div
+                onDrop={handleDrop}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onClick={openFilePicker}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") openFilePicker();
+                }}
+                className={`flex-1 border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 flex flex-col items-center justify-center cursor-pointer ${
+                  dragOver ? "border-accent-1 bg-accent-1/5" : "border-gray-300 hover:border-accent-1/50"
+                }`}
+              >
+                <Upload className={`h-16 w-16 mx-auto mb-6 ${dragOver ? "text-accent-1" : "text-gray-400"}`} />
 
-              <div className="text-center">
-                <p className="text-gray-600 mb-3 text-lg">Drag and drop files here</p>
-                <p className="text-gray-500 mb-2">or click to browse</p>
-                <p className="text-xs text-gray-400 mb-2">
-                  Supports .txt and .pdf files • Will combine with audio transcription
-                </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".txt,.pdf,text/plain,application/pdf"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="file-input"
-                  multiple
-                />
-                <label
-                  htmlFor="file-input"
-                  className="inline-block px-8 py-4 bg-accent-1 text-white rounded-lg hover:bg-accent-1/90 transition-colors cursor-pointer font-medium text-lg min-w-[12rem] min-h-[3.5rem]"
-                >
-                  Choose Files
-                </label>
-              </div>
-            </div>
-
-            {/* File List */}
-            {uploadedFiles.length > 0 && (
-              <div className="mt-6 border-2 border-accent-1/20 rounded-lg bg-white/50 backdrop-blur-sm">
-                <div className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <FileIcon className="h-5 w-5 text-accent-1" />
-                    <h4 className="text-sm font-semibold text-accent-1">
-                      Uploaded Files ({uploadedFiles.length})
-                    </h4>
+                <div className="text-center">
+                  <p className="text-gray-600 mb-3 text-lg">Drag and drop files here</p>
+                  <p className="text-gray-500 mb-2">or click to browse</p>
+                  <p className="text-xs text-gray-400 mb-4">
+                    Supports .txt and .pdf files
+                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".txt,.pdf,text/plain,application/pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="file-input"
+                    multiple
+                  />
+                  <div
+                    className="inline-block px-8 py-4 bg-accent-1 text-white rounded-lg hover:bg-accent-1/90 transition-colors cursor-pointer font-medium text-lg min-w-[12rem] min-h-[3.5rem]"
+                  >
+                    Choose Files
                   </div>
-                  
-                  <div className="max-h-40 overflow-y-auto">
-                    <div className="space-y-2">
-                      {uploadedFiles.map((uploadedFile) => (
-                        <div
-                          key={uploadedFile.id}
-                          className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-accent-1/30 hover:shadow-sm transition-all duration-200"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <FileIcon className="h-4 w-4 text-gray-500" />
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">
-                                {uploadedFile.file.name}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {(uploadedFile.file.size / 1024).toFixed(1)} KB
-                                {uploadedFile.status === "pending" && (
-                                  <span className="ml-2 text-green-600 font-medium">• Ready</span>
-                                )}
-                                {uploadedFile.status === "processing" && (
-                                  <span className="ml-2 text-accent-1 font-medium">• Processing...</span>
-                                )}
-                                {uploadedFile.status === "completed" && (
-                                  <span className="ml-2 text-green-600 font-medium">• Completed</span>
-                                )}
-                                {uploadedFile.status === "error" && (
-                                  <span className="ml-2 text-red-600 font-medium">• Error</span>
-                                )}
-                              </p>
+                </div>
+              </div>
+            ) : (
+              /* Files Uploaded State - Compact Column Layout */
+              <div className="h-full flex flex-col">
+                {/* Compact Upload Header */}
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onClick={openFilePicker}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") openFilePicker();
+                  }}
+                  className={`border-2 border-dashed rounded-lg p-4 text-center transition-all duration-200 cursor-pointer ${
+                    dragOver ? "border-accent-1 bg-accent-1/5" : "border-gray-300 hover:border-accent-1/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-3">
+                    <Upload className={`h-5 w-5 ${dragOver ? "text-accent-1" : "text-gray-400"}`} />
+                    <span className="text-sm text-gray-600">Drop more files or click to browse</span>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".txt,.pdf,text/plain,application/pdf"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="file-input"
+                      multiple
+                    />
+                  </div>
+                </div>
+
+                {/* Files List in Compact Column Layout */}
+                <div className="flex-1 mt-4 border-2 border-accent-1/20 rounded-lg bg-white/50 backdrop-blur-sm">
+                  <div className="p-4 h-full flex flex-col">
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileIcon className="h-5 w-5 text-accent-1" />
+                      <h4 className="text-sm font-semibold text-accent-1">
+                        Uploaded Files ({uploadedFiles.length})
+                      </h4>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto">
+                      <div className="space-y-2">
+                        {uploadedFiles.map((uploadedFile) => (
+                          <div
+                            key={uploadedFile.id}
+                            className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-accent-1/30 transition-all duration-200"
+                          >
+                            <div className="flex items-center space-x-3 min-w-0 flex-1">
+                              <FileIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {uploadedFile.file.name}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {(uploadedFile.file.size / 1024).toFixed(1)} KB
+                                  {uploadedFile.status === "pending" && (
+                                    <span className="ml-2 text-green-600 font-medium">• Ready</span>
+                                  )}
+                                  {uploadedFile.status === "processing" && (
+                                    <span className="ml-2 text-accent-1 font-medium">• Processing...</span>
+                                  )}
+                                  {uploadedFile.status === "completed" && (
+                                    <span className="ml-2 text-green-600 font-medium">• Completed</span>
+                                  )}
+                                  {uploadedFile.status === "error" && (
+                                    <span className="ml-2 text-red-600 font-medium">• Error</span>
+                                  )}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {uploadedFile.status === "pending" && (
-                              <button
-                                type="button"
-                                onClick={() => processFile(uploadedFile.file, uploadedFile.id)}
-                                className="px-3 py-1 text-sm rounded-md bg-accent-1 text-white hover:bg-accent-1/90 transition-colors duration-200"
-                              >
-                                Process
-                              </button>
-                            )}
                             <button
                               type="button"
-                              onClick={() => removeFile(uploadedFile.id)}
-                              className="p-1 hover:bg-gray-200 rounded-full transition-colors duration-200"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFile(uploadedFile.id);
+                              }}
+                              className="p-1 hover:bg-gray-200 rounded-full transition-colors duration-200 flex-shrink-0"
                               aria-label={`Remove ${uploadedFile.file.name}`}
                             >
                               <X className="h-4 w-4 text-gray-500" />
                             </button>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Staging Info */}
-                  <div className="mt-4 pt-3 border-t border-accent-1/10">
-                    <div className="flex flex-col items-center gap-2">
-                      <p className="text-sm text-gray-600 font-medium">
-                        📁 {uploadedFiles.length} file{uploadedFiles.length > 1 ? "s" : ""} ready for processing
-                      </p>
-                      <p className="text-xs text-gray-500 text-center">
-                        Files will be combined with audio transcription when recording is complete
-                      </p>
-                      <button
-                        type="button"
-                        className="px-4 py-2 rounded-lg bg-accent-1 text-white disabled:opacity-60 hover:bg-accent-1/90 transition-colors duration-200 font-medium"
-                        disabled={isProcessing || uploadedFiles.length === 0}
-                        onClick={processAllFiles}
-                      >
-                        {isProcessing ? "Processing..." : "Process All Files"}
-                      </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
