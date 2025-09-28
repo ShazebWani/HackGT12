@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useMemo, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useMemo, useEffect, useCallback } from 'react';
 import { Patient, PatientState, PatientAction } from '../lib/types';
 import { mockPatients } from '../lib/mock-data';
 
@@ -206,28 +206,28 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
       : null;
   }, [state.patients, state.activePatientId]);
 
-  // Action creators
-  const selectPatient = (id: string) => {
+  // Action creators - memoized to prevent infinite re-renders
+  const selectPatient = useCallback((id: string) => {
     dispatch({ type: 'SELECT_PATIENT', payload: id });
-  };
+  }, []);
 
-  const upsertPatient = (patient: Patient) => {
+  const upsertPatient = useCallback((patient: Patient) => {
     dispatch({ type: 'UPSERT_PATIENT', payload: patient });
-  };
+  }, []);
 
-  const touchPatient = (id: string) => {
+  const touchPatient = useCallback((id: string) => {
     dispatch({ type: 'TOUCH_PATIENT', payload: id });
-  };
+  }, []);
 
-  const setSearchQuery = (query: string) => {
+  const setSearchQuery = useCallback((query: string) => {
     dispatch({ type: 'SET_SEARCH_QUERY', payload: query });
-  };
+  }, []);
 
-  const setPendingNewPatient = (patient: Partial<Patient> | null) => {
+  const setPendingNewPatient = useCallback((patient: Partial<Patient> | null) => {
     dispatch({ type: 'SET_PENDING_NEW_PATIENT', payload: patient });
-  };
+  }, []);
 
-  const contextValue: PatientContextType = {
+  const contextValue: PatientContextType = useMemo(() => ({
     state,
     dispatch,
     patientsSorted,
@@ -238,7 +238,18 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     touchPatient,
     setSearchQuery,
     setPendingNewPatient,
-  };
+  }), [
+    state,
+    dispatch,
+    patientsSorted,
+    filteredPatients,
+    activePatient,
+    selectPatient,
+    upsertPatient,
+    touchPatient,
+    setSearchQuery,
+    setPendingNewPatient,
+  ]);
 
   return (
     <PatientContext.Provider value={contextValue}>
