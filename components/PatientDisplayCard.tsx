@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { User, FileText, ChevronDown, ChevronUp, Calendar, Pill } from 'lucide-react'
 import { usePatient } from '../contexts/PatientContext'
 import { MedicalRecord, Prescription } from '../lib/types'
@@ -10,6 +10,13 @@ const PatientDisplayCard = () => {
   const [expandedPrescription, setExpandedPrescription] = useState<string | null>(null)
 
   if (!activePatient) return null
+
+  // Reset dropdown states when patient changes
+  useEffect(() => {
+    setShowRecords(false)
+    setExpandedRecord(null)
+    setExpandedPrescription(null)
+  }, [activePatient?.id])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
