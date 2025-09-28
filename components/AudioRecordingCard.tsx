@@ -287,7 +287,7 @@ PLAN:
         
         {/* HIPAA Privacy Notice */}
         <div className="text-center">
-          <p className="text-xs text-gray-500">🔒 HIPAA compliant - Audio encrypted and automatically deleted</p>
+          <p className="text-xs text-gray-500">Audio recording is deleted after processing</p>
         </div>
       </div>
     </div>
