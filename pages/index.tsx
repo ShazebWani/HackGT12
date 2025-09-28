@@ -1,30 +1,28 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, User } from 'lucide-react'
+import { User } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import PatientInfoCard from '../components/PatientInfoCard'
 import PatientDisplayCard from '../components/PatientDisplayCard'
 import AudioRecordingCard from '../components/AudioRecordingCard'
 import TextFileUploadCard from '../components/TextFileUploadCard'
 import ResultsCard from '@/components/ResultsCard'
-import ProcessingIndicator from '@/components/ProcessingIndicator'
+import TypeWriter from '@/components/TypeWriter'
 import { usePatient } from '../contexts/PatientContext'
 
 export default function Home() {
   const [patientName, setPatientName] = useState('')
   const [patientDob, setPatientDob] = useState('')
-  const [results, setResults] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [isAudio, setIsAudio] = useState(false)
+  const [currentResults, setCurrentResults] = useState<any>(null)
 
   // Audio recorder state
   const [audioStatus, setAudioStatus] = useState<'idle' | 'recording'>('idle')
   
   // Patient context
-  const { state, activePatient } = usePatient()
+  const { state, activePatient, addMedicalRecord } = usePatient()
 
   const startRecording = () => {
     setAudioStatus('recording')
-    setResults(null)
     setIsProcessing(false)
   }
 
@@ -147,6 +145,11 @@ export default function Home() {
     }
   }, [])
 
+  // Clear results when active patient changes
+  useEffect(() => {
+    setCurrentResults(null);
+  }, [activePatient?.id]);
+
   // Helper: append a message to localStorage for a recipient (messages:username)
   const appendMessageForUser = (recipient: string, message: any) => {
     if (!recipient) return false
@@ -162,107 +165,74 @@ export default function Home() {
     }
   }
 
-  const sendResultsToPatient = () => {
-    const authRaw = localStorage.getItem('auth')
-    const user = authRaw ? JSON.parse(authRaw) : { username: 'Doctor' }
-    const recipient = patientName?.trim()
-    if (!recipient) {
-      alert('Please enter patient name in Patient Info before sending results.')
-      return
-    }
-
-    const msg = {
-      from: user.username || 'Doctor',
-      type: 'results',
-      body: `Medical results for ${recipient}: ${results ? results.diagnosis || 'No diagnosis' : 'No results'}`,
-      meta: { results },
-      timestamp: Date.now()
-    }
-
-    const ok = appendMessageForUser(recipient, msg)
-    if (ok) alert('Results sent to patient portal')
-  }
-
   return (
     <div className="flex h-screen min-h-screen bg-base overflow-clip">
       <Sidebar />
-      <div className='flex-1 overflow-auto p-6'>
-        <div className="max-w-6xl mx-auto">
+      <div className='flex-1 overflow-auto'>
+        <div className="h-full flex flex-col">
 
           {/* Patient Info - Show search form when no patient selected, display card when patient selected */}
           {!activePatient ? (
-            <PatientInfoCard 
-              patientName={patientName}
-              setPatientName={setPatientName}
-              patientDob={patientDob}
-              setPatientDob={setPatientDob}
-            />
+            <div className="flex-1 flex flex-col items-center justify-center p-12">
+              <div className="text-center mb-8">
+                <h1 className="text-2xl font-bold text-accent-1 mb-4">
+                  Hi I'm ScribeAgentAI
+                </h1>
+                <div className="text-lg text-gray-600">
+                  <TypeWriter 
+                    text="Input patient info to begin"
+                    speed={40}
+                    className="text-lg text-gray-600"
+                  />
+                </div>
+              </div>
+              <div className="w-full px-32">
+                <PatientInfoCard 
+                  patientName={patientName}
+                  setPatientName={setPatientName}
+                  patientDob={patientDob}
+                  setPatientDob={setPatientDob}
+                />
+              </div>
+            </div>
           ) : (
-            <PatientDisplayCard />
-          )}
-          
-          {/* Input Cards - Only show when a patient is selected */}
-          {activePatient && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <AudioRecordingCard 
-                audioStatus={audioStatus}
-                startRecording={startRecording}
-                stopRecording={stopRecording}
-                handleRecordingResults={handleRecordingResults}
-              />
+            <div className="min-h-screen">
+              {/* Centered patient section */}
+              <div className="min-h-screen flex flex-col justify-center p-12">
+                <div className="w-full px-8">
+                  <PatientDisplayCard />
+                
+                  {/* Input Cards - Only show when a patient is selected */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <AudioRecordingCard 
+                      audioStatus={audioStatus}
+                      startRecording={startRecording}
+                      stopRecording={stopRecording}
+                      handleRecordingResults={handleRecordingResults}
+                    />
+                    
+                    <TextFileUploadCard 
+                      onFileUpload={handleTextFileUpload}
+                    />
+                  </div>
+                </div>
+              </div>
               
-              <TextFileUploadCard 
-                onFileUpload={handleTextFileUpload}
-              />
+              {/* Results Display - Off screen below */}
+              {currentResults && (
+                <div className="p-8">
+                  <div className="max-w-none mx-auto px-8">
+                    <div id="results-section" className="medical-card">
+                      <ResultsCard 
+                        results={currentResults}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-          
-          {/* Results Area */}
-          {displayResults && (
-            <div className="medical-card">
-              <div className="mb-4 p-4 bg-green-100 border border-green-300 rounded-lg">
-                <p className="text-green-800 font-medium">✅ SOAP Agent Results Displayed</p>
-                <p className="text-green-700 text-sm">Data received and being rendered</p>
-              </div>
-              <ResultsCard results={displayResults} />
-            </div>
-          )}
-          
-          
-          
-          {!displayResults && !isProcessing && activePatient && (
-            <div className="medical-card text-center py-12">
-              <div className="text-gray-400 mb-4">
-                <User className="h-16 w-16 mx-auto mb-4" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Patient Selected: {activePatient.firstName} {activePatient.lastName}
-              </h3>
-              <p className="text-gray-500 mb-4">
-                Record audio or upload text to generate medical documentation.
-              </p>
-              <div className="text-sm text-gray-400">
-                MRN: {activePatient.mrn} • DOB: {activePatient.dateOfBirth}
-              </div>
-            </div>
-          )}
-          
-          {!displayResults && !isProcessing && !activePatient && (
-            <div className="medical-card text-center py-12">
-              <div className="text-gray-400 mb-4">
-                <User className="h-16 w-16 mx-auto mb-4" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Welcome to Medical Dashboard
-              </h3>
-              <p className="text-gray-500 mb-4">
-                Select an existing patient from the sidebar or enter patient information below to get started with medical documentation.
-              </p>
-              <div className="text-sm text-gray-400">
-                Enter patient details to begin searching or creating patient records
-              </div>
-            </div>)}
-          </div>
+        </div>
       </div>
     </div>
   )

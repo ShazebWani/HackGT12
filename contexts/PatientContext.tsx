@@ -91,6 +91,24 @@ function patientReducer(state: PatientState, action: PatientAction): PatientStat
         pendingNewPatient: action.payload,
       };
 
+    case 'ADD_MEDICAL_RECORD': {
+      const { patientId, record } = action.payload;
+      const updatedPatients = state.patients.map(patient =>
+        patient.id === patientId
+          ? { 
+              ...patient, 
+              medicalRecords: [...(patient.medicalRecords || []), record],
+              lastUpdated: new Date().toISOString()
+            }
+          : patient
+      );
+
+      return {
+        ...state,
+        patients: updatedPatients,
+      };
+    }
+
     default:
       return state;
   }
@@ -110,6 +128,7 @@ interface PatientContextType {
   touchPatient: (id: string) => void;
   setSearchQuery: (query: string) => void;
   setPendingNewPatient: (patient: Partial<Patient> | null) => void;
+  addMedicalRecord: (patientId: string, record: MedicalRecord) => void;
 }
 
 // Create context
@@ -221,6 +240,10 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_PENDING_NEW_PATIENT', payload: patient });
   }, []);
 
+  const addMedicalRecord = useCallback((patientId: string, record: MedicalRecord) => {
+    dispatch({ type: 'ADD_MEDICAL_RECORD', payload: { patientId, record } });
+  }, []);
+
   const contextValue: PatientContextType = useMemo(() => ({
     state,
     dispatch,
@@ -232,6 +255,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     touchPatient,
     setSearchQuery,
     setPendingNewPatient,
+    addMedicalRecord,
   }), [
     state,
     dispatch,
@@ -243,6 +267,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     touchPatient,
     setSearchQuery,
     setPendingNewPatient,
+    addMedicalRecord,
   ]);
 
   return (
