@@ -228,20 +228,7 @@ export default function Home() {
             </div>
           )}
           
-          {/* Debug info */}
-          {!displayResults && (
-            <div className="medical-card p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
-              <p className="text-yellow-800 font-medium">⚠️ No Results to Display</p>
-              <p className="text-yellow-700 text-sm">Results state: {results ? 'Has data' : 'No data'}</p>
-              <p className="text-yellow-700 text-sm">Display results: {displayResults ? 'Has data' : 'No data'}</p>
-              <button 
-                onClick={testSetResults}
-                className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                🧪 Test Set Results (Debug)
-              </button>
-            </div>
-          )}
+          
           
           {!displayResults && !isProcessing && activePatient && (
             <div className="medical-card text-center py-12">
