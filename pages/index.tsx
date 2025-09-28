@@ -151,6 +151,8 @@ export default function Home() {
   // Clear results when active patient changes
   useEffect(() => {
     setCurrentResults(null);
+    setResults(null);
+    setIsAudio(null);
   }, [activePatient?.id]);
 
   // Helper: append a message to localStorage for a recipient (messages:username)
@@ -230,9 +232,9 @@ export default function Home() {
               
               {/* Results Display - Off screen below */}
               {results && (
-                <div className="p-8">
-                  <div className="max-w-none mx-auto px-8">
-                    <div id="results-section" className="medical-card">
+                <div className="min-h-screen flex flex-col justify-center p-12">
+                  <div className="w-full px-8">
+                    <div id="results-section">
                       <ResultsCard 
                         results={results}
                       />

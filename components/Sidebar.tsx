@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Stethoscope, SidebarClose, SidebarOpen, User, UserCircle, Plus } from 'lucide-react'
+import { Stethoscope, SidebarClose, SidebarOpen, User, UserCircle, Plus, LogOut } from 'lucide-react'
 import { usePatient } from '../contexts/PatientContext'
 
 const Sidebar = () => {
@@ -57,9 +57,18 @@ const Sidebar = () => {
     localStorage.setItem('sidebarCollapsed', newCollapsedState.toString());
   };
 
+  const handleLogout = () => {
+    // Clear authentication data
+    localStorage.removeItem('auth');
+    // Clear sidebar state
+    localStorage.removeItem('sidebarCollapsed');
+    // Redirect to login page
+    window.location.href = '/login';
+  };
+
   return (
     <aside className={`h-full bg-accent-1 flex flex-col transition-all duration-300 z-10 ${
-      isCollapsed ? 'w-12' : 'w-64'
+      isCollapsed ? 'w-16' : 'w-64'
     }`}>
       {/* Header */}
       <div className="flex items-center h-12 border-b border-white/20 px-3">
@@ -129,7 +138,7 @@ const Sidebar = () => {
 
       {/* Patient List - Only show when not collapsed */}
       {!isCollapsed && (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto sidebar-scrollbar">
           {filteredPatients.length === 0 ? (
             <div className="p-4 text-white/70 text-sm text-center">
               No patients found
@@ -176,6 +185,22 @@ const Sidebar = () => {
           )}
         </div>
       )}
+
+      {/* Logout Button - Fixed at bottom */}
+      <div className="mt-auto p-2 border-t border-white/20">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 cursor-pointer hover:bg-white/20 rounded-lg transition-colors duration-200 min-w-0 h-12 p-3"
+          title={isCollapsed ? "Logout" : undefined}
+        >
+          <div className="flex-shrink-0 flex items-center justify-center">
+            <LogOut className="h-5 w-5 text-white/80" />
+          </div>
+          <div className={`text-white/90 text-sm font-medium truncate flex items-center ${isCollapsed ? 'hidden' : ''}`}>
+            Logout
+          </div>
+        </button>
+      </div>
     </aside>
   )
 }
