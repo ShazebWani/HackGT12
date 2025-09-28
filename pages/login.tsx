@@ -42,7 +42,7 @@ export default function LoginPage() {
           <label className="block text-sm text-gray-700 mb-2">Role</label>
           <div className="flex space-x-2">
             <button
-              className={`px-4 py-2 rounded ${role === 'doctor' ? 'bg-accent-1 text-white' : 'bg-gray-100'}`}
+              className={`cursor-pointer px-4 py-2 rounded ${role === 'doctor' ? 'bg-accent-1 text-white' : 'bg-gray-100'}`}
               onClick={() => setRole('doctor')}
               type="button"
             >
