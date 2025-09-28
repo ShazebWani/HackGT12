@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { User, Search, Plus, X } from 'lucide-react'
+import { User, Search, Plus, X, CheckCircle, AlertCircle } from 'lucide-react'
 import { usePatient } from '../contexts/PatientContext'
 import { Patient } from '../lib/types'
 
@@ -25,6 +25,9 @@ const PatientInfoCard = ({ patientName = '', setPatientName = () => {}, patientD
   const [mrn, setMrn] = useState('')
   const [dateOfBirth, setDateOfBirth] = useState('')
   const [showNewPatientModal, setShowNewPatientModal] = useState(false)
+  const [showNotification, setShowNotification] = useState(false)
+  const [notificationMessage, setNotificationMessage] = useState('')
+  const [notificationType, setNotificationType] = useState<'error' | 'success'>('error')
 
   // Update search query as user types to filter sidebar
   useEffect(() => {
@@ -53,6 +56,18 @@ const PatientInfoCard = ({ patientName = '', setPatientName = () => {}, patientD
     return `MRN-${timestamp}${random}`;
   };
 
+  // Show notification helper
+  const showNotificationMessage = (message: string, type: 'error' | 'success') => {
+    setNotificationMessage(message);
+    setNotificationType(type);
+    setShowNotification(true);
+    
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+      setShowNotification(false);
+    }, 3000);
+  };
+
   // Find patient by criteria
   const findPatient = (firstName: string, lastName: string, dob: string, mrn?: string) => {
     return state.patients.find(patient => {
@@ -74,7 +89,7 @@ const PatientInfoCard = ({ patientName = '', setPatientName = () => {}, patientD
     
     // Validate required fields
     if (!firstName.trim() || !lastName.trim() || !dateOfBirth || !mrn.trim()) {
-      alert('Please fill in all required fields (First Name, Last Name, Date of Birth, MRN)');
+      showNotificationMessage('Please fill in all required fields (First Name, Last Name, Date of Birth, MRN)', 'error');
       return;
     }
 
@@ -125,9 +140,12 @@ const PatientInfoCard = ({ patientName = '', setPatientName = () => {}, patientD
       setShowNewPatientModal(false);
       setPendingNewPatient(null);
       clearForm();
+      
+      // Show success notification
+      showNotificationMessage(`Patient ${newPatient.firstName} ${newPatient.lastName} created successfully!`, 'success');
     } catch (error) {
       console.error('Error creating patient:', error);
-      alert('Failed to create patient. Please try again.');
+      showNotificationMessage('Failed to create patient. Please try again.', 'error');
     }
   };
 
@@ -205,7 +223,7 @@ const PatientInfoCard = ({ patientName = '', setPatientName = () => {}, patientD
                 type="text"
                 value={mrn}
                 onChange={(e) => setMrn(e.target.value)}
-                placeholder="Enter MRN"
+                placeholder="MRN-XXXXXXXX"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors"
                 required
               />
@@ -234,8 +252,8 @@ const PatientInfoCard = ({ patientName = '', setPatientName = () => {}, patientD
 
       {/* New Patient Modal */}
       {showNewPatientModal && state.pendingNewPatient && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/80 bg-opacity-30 z-50 flex items-center justify-center p-4 modal-backdrop">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 modal-content">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Create New Patient</h3>
               <button
@@ -274,6 +292,39 @@ const PatientInfoCard = ({ patientName = '', setPatientName = () => {}, patientD
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Modal */}
+      {showNotification && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              {notificationType === 'error' ? (
+                <AlertCircle className="h-6 w-6 text-red-500 flex-shrink-0" />
+              ) : (
+                <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0" />
+              )}
+              <h3 className={`text-lg font-semibold ${notificationType === 'error' ? 'text-red-900' : 'text-green-900'}`}>
+                {notificationType === 'error' ? 'Error' : 'Success'}
+              </h3>
+            </div>
+            
+            <p className="text-gray-700 mb-6">
+              {notificationMessage}
+            </p>
+            
+            <button
+              onClick={() => setShowNotification(false)}
+              className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
+                notificationType === 'error' 
+                  ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+              }`}
+            >
+              OK
+            </button>
           </div>
         </div>
       )}
