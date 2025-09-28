@@ -105,29 +105,34 @@ const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDo
   };
 
   // Handle new patient creation
-  const handleCreatePatient = () => {
+  const handleCreatePatient = async () => {
     if (!state.pendingNewPatient) return;
 
-    const newPatient: Patient = {
-      id: `patient-${Date.now()}`,
-      mrn: state.pendingNewPatient.mrn!,
-      firstName: state.pendingNewPatient.firstName!,
-      lastName: state.pendingNewPatient.lastName!,
-      dateOfBirth: state.pendingNewPatient.dateOfBirth!,
-      lastUpdated: new Date().toISOString(),
-      // No medical data initially
-    };
+    try {
+      const newPatient: Patient = {
+        id: `patient-${Date.now()}`,
+        mrn: state.pendingNewPatient.mrn!,
+        firstName: state.pendingNewPatient.firstName!,
+        lastName: state.pendingNewPatient.lastName!,
+        dateOfBirth: state.pendingNewPatient.dateOfBirth!,
+        lastUpdated: new Date().toISOString(),
+        // No medical data initially
+      };
 
-    upsertPatient(newPatient);
-    
-    // Update legacy form fields
-    setPatientName(`${newPatient.firstName} ${newPatient.lastName}`);
-    setPatientDob(newPatient.dateOfBirth);
-    
-    // Close modal and clear forms
-    setShowNewPatientModal(false);
-    setPendingNewPatient(null);
-    clearForm();
+      await upsertPatient(newPatient);
+      
+      // Update legacy form fields
+      setPatientName(`${newPatient.firstName} ${newPatient.lastName}`);
+      setPatientDob(newPatient.dateOfBirth);
+      
+      // Close modal and clear forms
+      setShowNewPatientModal(false);
+      setPendingNewPatient(null);
+      clearForm();
+    } catch (error) {
+      console.error('Error creating patient:', error);
+      alert('Failed to create patient. Please try again.');
+    }
   };
 
   // Clear form fields

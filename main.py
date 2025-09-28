@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict
@@ -9,8 +9,10 @@ import assemblyai as aai
 from backend.realtime_transcribe import AudioTranscribe
 import threading
 import json
+from datetime import datetime
 from dotenv import load_dotenv
-from database import database, transcripts
+from database import database, transcripts, patients
+from agents.soap_agent import generate_soap_note
 
 # Load environment variables
 load_dotenv()
@@ -49,6 +51,28 @@ class ScribeAgentResponse(BaseModel):
     prescriptions: List[Prescription]
     lab_orders: List[str]
 
+class PatientCreate(BaseModel):
+    mrn: str
+    first_name: str
+    last_name: str
+    date_of_birth: str
+
+class PatientUpdate(BaseModel):
+    mrn: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    medical_data: Optional[dict] = None
+
+class PatientResponse(BaseModel):
+    id: str
+    mrn: str
+    first_name: str
+    last_name: str
+    date_of_birth: str
+    last_updated: str
+    medical_data: Optional[dict] = None
+
 # Mock AI functions
 async def transcribe_audio_mock(audio_bytes: bytes) -> str:
     """Mock transcription function"""
@@ -65,21 +89,6 @@ async def extract_entities_mock(transcription: str) -> dict:
         "lab_orders": ["throat culture"]
     }
 
-async def generate_soap_note_mock(entities: dict) -> str:
-    """Mock SOAP note generation function"""
-    return """SUBJECTIVE:
-34-year-old male presents with chief complaint of sore throat, fever, and swollen lymph nodes.
-
-OBJECTIVE:
-Physical examination reveals erythematous throat with tonsillar exudate. Palpable cervical lymphadenopathy noted. Rapid strep test positive.
-
-ASSESSMENT:
-Acute streptococcal pharyngitis (J02.0)
-
-PLAN:
-1. Prescribe Amoxicillin 500mg twice daily for 10 days
-2. Order follow-up throat culture
-3. Patient advised to return if symptoms worsen or persist"""
 
 # Billing code functions
 def load_billing_codes():
@@ -136,6 +145,186 @@ async def shutdown():
 async def root():
     return {"message": "ScribeAgent AI Backend is running"}
 
+# Patient API endpoints
+@app.post("/api/patients", response_model=PatientResponse)
+async def create_patient(patient: PatientCreate):
+    """Create a new patient"""
+    try:
+        # Generate unique ID
+        patient_id = f"patient-{int(datetime.utcnow().timestamp() * 1000)}"
+        
+        # Check if MRN already exists
+        query = patients.select().where(patients.c.mrn == patient.mrn)
+        existing = await database.fetch_one(query)
+        if existing:
+            raise HTTPException(status_code=400, detail="Patient with this MRN already exists")
+        
+        # Insert new patient
+        insert_query = patients.insert().values(
+            id=patient_id,
+            mrn=patient.mrn,
+            first_name=patient.first_name,
+            last_name=patient.last_name,
+            date_of_birth=patient.date_of_birth,
+            last_updated=datetime.utcnow(),
+            medical_data=None
+        )
+        await database.execute(insert_query)
+        
+        # Return the created patient
+        return PatientResponse(
+            id=patient_id,
+            mrn=patient.mrn,
+            first_name=patient.first_name,
+            last_name=patient.last_name,
+            date_of_birth=patient.date_of_birth,
+            last_updated=datetime.utcnow().isoformat(),
+            medical_data=None
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/patients", response_model=List[PatientResponse])
+async def get_patients():
+    """Get all patients"""
+    try:
+        query = patients.select().order_by(patients.c.last_updated.desc())
+        results = await database.fetch_all(query)
+        
+        patients_list = []
+        for row in results:
+            medical_data = None
+            if row.medical_data:
+                try:
+                    medical_data = json.loads(row.medical_data)
+                except:
+                    medical_data = None
+            
+            patients_list.append(PatientResponse(
+                id=row.id,
+                mrn=row.mrn,
+                first_name=row.first_name,
+                last_name=row.last_name,
+                date_of_birth=row.date_of_birth,
+                last_updated=row.last_updated.isoformat(),
+                medical_data=medical_data
+            ))
+        
+        return patients_list
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/patients/{patient_id}", response_model=PatientResponse)
+async def get_patient(patient_id: str):
+    """Get a specific patient by ID"""
+    try:
+        query = patients.select().where(patients.c.id == patient_id)
+        result = await database.fetch_one(query)
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        
+        medical_data = None
+        if result.medical_data:
+            try:
+                medical_data = json.loads(result.medical_data)
+            except:
+                medical_data = None
+        
+        return PatientResponse(
+            id=result.id,
+            mrn=result.mrn,
+            first_name=result.first_name,
+            last_name=result.last_name,
+            date_of_birth=result.date_of_birth,
+            last_updated=result.last_updated.isoformat(),
+            medical_data=medical_data
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/patients/{patient_id}", response_model=PatientResponse)
+async def update_patient(patient_id: str, patient_update: PatientUpdate):
+    """Update a patient"""
+    try:
+        # Check if patient exists
+        query = patients.select().where(patients.c.id == patient_id)
+        existing = await database.fetch_one(query)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        
+        # Build update data
+        update_data = {}
+        if patient_update.mrn is not None:
+            # Check if new MRN already exists
+            if patient_update.mrn != existing.mrn:
+                mrn_query = patients.select().where(patients.c.mrn == patient_update.mrn)
+                mrn_existing = await database.fetch_one(mrn_query)
+                if mrn_existing:
+                    raise HTTPException(status_code=400, detail="Patient with this MRN already exists")
+            update_data["mrn"] = patient_update.mrn
+        if patient_update.first_name is not None:
+            update_data["first_name"] = patient_update.first_name
+        if patient_update.last_name is not None:
+            update_data["last_name"] = patient_update.last_name
+        if patient_update.date_of_birth is not None:
+            update_data["date_of_birth"] = patient_update.date_of_birth
+        if patient_update.medical_data is not None:
+            update_data["medical_data"] = json.dumps(patient_update.medical_data)
+        
+        update_data["last_updated"] = datetime.utcnow()
+        
+        # Update patient
+        update_query = patients.update().where(patients.c.id == patient_id).values(**update_data)
+        await database.execute(update_query)
+        
+        # Return updated patient
+        updated_query = patients.select().where(patients.c.id == patient_id)
+        updated = await database.fetch_one(updated_query)
+        
+        medical_data = None
+        if updated.medical_data:
+            try:
+                medical_data = json.loads(updated.medical_data)
+            except:
+                medical_data = None
+        
+        return PatientResponse(
+            id=updated.id,
+            mrn=updated.mrn,
+            first_name=updated.first_name,
+            last_name=updated.last_name,
+            date_of_birth=updated.date_of_birth,
+            last_updated=updated.last_updated.isoformat(),
+            medical_data=medical_data
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/patients/{patient_id}")
+async def delete_patient(patient_id: str):
+    """Delete a patient"""
+    try:
+        # Check if patient exists
+        query = patients.select().where(patients.c.id == patient_id)
+        existing = await database.fetch_one(query)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        
+        # Delete patient
+        delete_query = patients.delete().where(patients.c.id == patient_id)
+        await database.execute(delete_query)
+        
+        return {"message": "Patient deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/process-visit", response_model=ScribeAgentResponse)
 async def process_visit(file: UploadFile = File(...)):
     """
@@ -150,8 +339,8 @@ async def process_visit(file: UploadFile = File(...)):
     # Step 2: Extract entities from transcription (mock)
     entities = await extract_entities_mock(transcription)
     
-    # Step 3: Generate SOAP note from entities (mock)
-    soap_note = await generate_soap_note_mock(entities)
+    # Step 3: Generate SOAP note using the real SOAP agent
+    soap_note = await generate_soap_note(transcription)
     
     # Step 4: Get billing code using real lookup function
     billing_code = get_billing_code(entities["diagnosis"])
@@ -193,8 +382,8 @@ async def run_final_processing(transcript: str) -> dict:
         # Step 1: Extract entities from the final transcript
         entities = await extract_entities_mock(transcript)
         
-        # Step 2: Generate SOAP note from entities
-        soap_note = await generate_soap_note_mock(entities)
+        # Step 2: Generate SOAP note using the real SOAP agent
+        soap_note = await generate_soap_note(transcript)
         
         # Step 3: Get billing code using real lookup function
         billing_code = get_billing_code(entities["diagnosis"])
@@ -364,15 +553,47 @@ async def transcription(websocket: WebSocket):
     def on_final_cb(full_text: str):
         print("on_final_cb")
         try:
-            print("sent")
+            print("Processing final transcript with SOAP agent...")
+            # Process the transcript through SOAP agent
+            asyncio.run_coroutine_threadsafe(process_transcript_with_soap(full_text.strip()), loop)
+            
+        except Exception as e:
+            print(f"Error in on_final_cb: {e}")
+            # Fallback to just sending transcription
             transcript_queue.put_nowait({
                 "type": "final_result",
                 "data": {"transcription": full_text.strip()},
                 "is_final": True
             })
+
+    async def process_transcript_with_soap(transcript: str):
+        """Process transcript through SOAP agent and send results"""
+        try:
+            print(f"🤖 Processing transcript with SOAP agent: {transcript[:100]}...")
             
-        except asyncio.QueueFull:
-            print("Queue full, could not enqueue final_result")
+            # Run final processing with SOAP agent
+            medical_data = await run_final_processing(transcript)
+            
+            print(f"📋 SOAP agent generated medical data: {medical_data.keys() if isinstance(medical_data, dict) else 'Not a dict'}")
+            print(f"📋 Medical data structure: {medical_data}")
+            
+            # Send structured medical data to client
+            transcript_queue.put_nowait({
+                "type": "final_result",
+                "data": medical_data,
+                "is_final": True
+            })
+            
+            print("✅ SOAP processing complete, medical data sent to client")
+            
+        except Exception as e:
+            print(f"❌ Error processing transcript with SOAP agent: {e}")
+            # Fallback to just sending transcription
+            transcript_queue.put_nowait({
+                "type": "final_result",
+                "data": {"transcription": transcript},
+                "is_final": True
+            })
 
     def run_transcriber():
         transcriber.run( stop_event=stop_event, on_final=on_final_cb)

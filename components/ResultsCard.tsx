@@ -24,7 +24,21 @@ interface ResultsCardPropsExtended extends ResultsCardProps {
 }
 
 export default function ResultsCard({ results, onSend }: ResultsCardPropsExtended) {
-  if (!results) return null
+  console.log("🔍 ResultsCard received data:", results);
+  
+  if (!results) {
+    console.log("❌ ResultsCard: No results data provided");
+    return null;
+  }
+  
+  console.log("✅ ResultsCard: Rendering with data:", {
+    hasTranscription: !!results.transcription,
+    hasSoapNote: !!results.soap_note,
+    hasDiagnosis: !!results.diagnosis,
+    hasBillingCode: !!results.billing_code,
+    prescriptionsCount: results.prescriptions?.length || 0,
+    labOrdersCount: results.lab_orders?.length || 0
+  });
 
   return (
     <div className="medical-card w-full min-h-screen">

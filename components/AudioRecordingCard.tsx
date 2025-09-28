@@ -17,6 +17,15 @@ const AudioRecordingCard = ({ audioStatus, startRecording, stopRecording, handle
   const streamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<BlobPart[]>([])
 
+  // Track when audioResults changes
+  useEffect(() => {
+    console.log("🔄 AudioResults state changed:", audioResults);
+    if (audioResults) {
+      console.log("📤 Calling handleRecordingResults with:", audioResults);
+      handleRecordingResults(audioResults);
+    }
+  }, [audioResults, handleRecordingResults]);
+
   function getWsUrl() {
     if (typeof window === 'undefined') return 'ws://localhost:8000/ws/transcription'
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
@@ -39,7 +48,29 @@ const AudioRecordingCard = ({ audioStatus, startRecording, stopRecording, handle
         console.log('WS msg', data)
 
         if (data.type === "final_result") {
-          setAudioResults?.({ transcription: data.data.transcription, isFinal: true })
+          console.log("📋 Final result received:", data);
+          console.log("📋 Data structure analysis:", {
+            hasData: !!data.data,
+            dataKeys: data.data ? Object.keys(data.data) : 'No data object',
+            hasTranscription: !!(data.data?.transcription),
+            hasSoapNote: !!(data.data?.soap_note),
+            hasDiagnosis: !!(data.data?.diagnosis),
+            hasBillingCode: !!(data.data?.billing_code),
+            dataType: typeof data.data
+          });
+          
+          // Check if we have structured medical data or just transcription
+          if (data.data && data.data.transcription && data.data.soap_note) {
+            // Full structured medical data
+            console.log("✅ Full SOAP agent data received - calling setAudioResults");
+            setAudioResults?.(data.data)
+          } else if (data.data && data.data.transcription) {
+            // Just transcription (fallback)
+            console.log("⚠️ Only transcription received, no SOAP data - calling setAudioResults with fallback");
+            setAudioResults?.({ transcription: data.data.transcription, isFinal: true })
+          } else {
+            console.log("❌ No valid data in final result - not calling setAudioResults");
+          }
           ws.close()  // close here, not earlier
           setIsProcessing(false)
         }
@@ -144,7 +175,6 @@ PLAN:
         }
         
         setIsProcessing(false)
-        handleRecordingResults(mockResults)
         stopAll()
       }, 2200) // 2.2s processing simulation
     }
