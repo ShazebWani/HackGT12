@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""
+Test script for the complete audio to SOAP note integration
+"""
+import asyncio
+import os
+from dotenv import load_dotenv
+from main import run_final_processing
+
+# Load environment variables
+load_dotenv()
+
+async def test_full_integration():
+    """Test the complete flow from transcript to SOAP note"""
+    
+    # Check if OpenAI API key is set
+    if not os.getenv("OPENAI_API_KEY"):
+        print("❌ Error: OPENAI_API_KEY not found in environment variables")
+        print("Please set your OpenAI API key in a .env file or environment variable")
+        print("You can get an API key from: https://platform.openai.com/api-keys")
+        return
+    
+    # Sample medical transcript for testing
+    test_transcript = """
+    Patient is a 45-year-old male here for a follow-up on his hypertension. 
+    He says he's been taking his lisinopril daily and has been checking his blood pressure, 
+    which is running about 130 over 80. No complaints of dizziness or side effects. 
+    Exam shows a BP of 128/82 and a heart rate of 70. Lungs are clear. 
+    We'll continue the current dose of lisinopril 10mg and see him back in 3 months.
+    """
+    
+    print("🧪 Testing Complete Audio to SOAP Note Integration...")
+    print(f"📝 Test transcript: {test_transcript.strip()}")
+    print("\n" + "="*60)
+    
+    try:
+        # Test the complete processing pipeline
+        result = await run_final_processing(test_transcript)
+        
+        print("✅ Complete Integration Test Successful!")
+        print("\n📋 Generated Medical Data:")
+        print("-" * 40)
+        
+        # Display the structured medical data
+        if 'transcription' in result:
+            print(f"Transcription: {result['transcription'][:100]}...")
+        
+        if 'soap_note' in result:
+            print(f"\nSOAP Note:\n{result['soap_note']}")
+        
+        if 'diagnosis' in result:
+            print(f"\nDiagnosis: {result['diagnosis']}")
+        
+        if 'billing_code' in result:
+            print(f"Billing Code: {result['billing_code']['code']} - {result['billing_code']['description']}")
+        
+        if 'prescriptions' in result:
+            print(f"\nPrescriptions: {len(result['prescriptions'])} found")
+            for i, rx in enumerate(result['prescriptions'], 1):
+                print(f"  {i}. {rx['medication']} {rx['dosage']} {rx['frequency']} for {rx['duration']}")
+        
+        if 'lab_orders' in result:
+            print(f"\nLab Orders: {result['lab_orders']}")
+        
+        print("-" * 40)
+        print("🎉 Integration test completed successfully!")
+        
+    except Exception as e:
+        print(f"❌ Error in integration test: {e}")
+        print("This might be due to:")
+        print("1. Missing or invalid OPENAI_API_KEY")
+        print("2. Network connectivity issues")
+        print("3. SOAP agent configuration issues")
+
+if __name__ == "__main__":
+    asyncio.run(test_full_integration())

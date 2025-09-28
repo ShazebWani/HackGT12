@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useMemo, useEffect, useCallback } from 'react';
 import { Patient, PatientState, PatientAction } from '../lib/types';
-import { mockPatients } from '../lib/mock-data';
+import { PatientService } from '../lib/patientService';
 
 // Initial state
 const initialState: PatientState = {
@@ -124,34 +124,16 @@ export function usePatient() {
   return context;
 }
 
-// Helper function to load patients from localStorage
-function loadPatientsFromStorage(): Patient[] {
-  if (typeof window === 'undefined') return mockPatients;
-  
+// Helper function to load patients from API
+async function loadPatientsFromAPI(): Promise<Patient[]> {
   try {
-    const stored = localStorage.getItem('patients');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Validate that it's an array and has proper structure
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
+    console.log('Loading patients from API...');
+    const patients = await PatientService.getAllPatients();
+    console.log('Loaded patients from API:', patients);
+    return patients;
   } catch (error) {
-    console.warn('Failed to load patients from localStorage:', error);
-  }
-  
-  return mockPatients;
-}
-
-// Helper function to save patients to localStorage
-function savePatientsToStorage(patients: Patient[]) {
-  if (typeof window === 'undefined') return;
-  
-  try {
-    localStorage.setItem('patients', JSON.stringify(patients));
-  } catch (error) {
-    console.warn('Failed to save patients to localStorage:', error);
+    console.error('Failed to load patients from API:', error);
+    return [];
   }
 }
 
@@ -159,20 +141,16 @@ function savePatientsToStorage(patients: Patient[]) {
 export function PatientProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(patientReducer, initialState);
 
-  // Initialize patients from localStorage or mock data
+  // Initialize patients from API
   useEffect(() => {
-    const patients = loadPatientsFromStorage();
-    patients.forEach(patient => {
-      dispatch({ type: 'LOAD_PATIENT', payload: patient });
-    });
+    const loadPatients = async () => {
+      const patients = await loadPatientsFromAPI();
+      patients.forEach(patient => {
+        dispatch({ type: 'LOAD_PATIENT', payload: patient });
+      });
+    };
+    loadPatients();
   }, []);
-
-  // Save to localStorage whenever patients change
-  useEffect(() => {
-    if (state.patients.length > 0) {
-      savePatientsToStorage(state.patients);
-    }
-  }, [state.patients]);
 
   // Derived selectors using useMemo for performance
   const patientsSorted = useMemo(() => {
@@ -211,9 +189,25 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SELECT_PATIENT', payload: id });
   }, []);
 
-  const upsertPatient = useCallback((patient: Patient) => {
-    dispatch({ type: 'UPSERT_PATIENT', payload: patient });
-  }, []);
+  const upsertPatient = useCallback(async (patient: Patient) => {
+    try {
+      let savedPatient: Patient;
+      
+      if (patient.id && state.patients.find(p => p.id === patient.id)) {
+        // Update existing patient
+        savedPatient = await PatientService.updatePatient(patient.id, patient);
+      } else {
+        // Create new patient
+        savedPatient = await PatientService.createPatient(patient);
+      }
+      
+      dispatch({ type: 'UPSERT_PATIENT', payload: savedPatient });
+    } catch (error) {
+      console.error('Error saving patient:', error);
+      // You might want to show an error message to the user here
+      throw error;
+    }
+  }, [state.patients]);
 
   const touchPatient = useCallback((id: string) => {
     dispatch({ type: 'TOUCH_PATIENT', payload: id });

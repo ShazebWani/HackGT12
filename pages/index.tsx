@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Search, User } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
 import PatientInfoCard from '../components/PatientInfoCard'
@@ -33,21 +33,46 @@ export default function Home() {
     setIsProcessing(true)
   }
 
-  const handleRecordingResults = (recordingResults: any) => {
-    console.log("Recording results:", recordingResults);
+  const handleRecordingResults = useCallback((recordingResults: any) => {
+    console.log("🎤 Recording results received:", recordingResults);
 
-    if (!recordingResults) return;
+    if (!recordingResults) {
+      console.log("❌ No recording results provided");
+      return;
+    }
 
-    // Always set just the transcription string, not the whole object
-    const text = recordingResults.transcription;
+    // Check if we have structured medical data from SOAP agent
+    if (recordingResults.transcription && recordingResults.soap_note) {
+      // Full structured medical data - set as results for display
+      console.log("✅ Setting SOAP agent results:", recordingResults);
+      console.log("📊 Data structure check:", {
+        hasTranscription: !!recordingResults.transcription,
+        hasSoapNote: !!recordingResults.soap_note,
+        hasDiagnosis: !!recordingResults.diagnosis,
+        hasBillingCode: !!recordingResults.billing_code,
+        prescriptionsCount: recordingResults.prescriptions?.length || 0
+      });
+      
+      setResults(recordingResults);
+      setIsProcessing(false);
+      
+      console.log("🔄 Results state should now be updated");
+    } else if (recordingResults.transcription) {
+      // Just transcription (fallback)
+      console.log("⚠️ Only transcription received, no SOAP data");
+      const text = recordingResults.transcription;
+      setIsAudio(text);
+      setIsProcessing(!recordingResults.isFinal);
+    } else {
+      console.log("❌ No valid data received from recording");
+    }
+  }, []);
 
-    setIsAudio(text);  // <-- store string, not object
-    setIsProcessing(!recordingResults.isFinal); // still use isFinal for processing state
-  };
-
-  // Auto-scroll to results when they appear
+  // Track results state changes
   useEffect(() => {
+    console.log("🔄 Results state changed:", results);
     if (results) {
+      console.log("✅ Results are now available for display");
       // Small delay to ensure the results section is rendered
       setTimeout(() => {
         const resultsSection = document.getElementById('results-section')
@@ -58,6 +83,8 @@ export default function Home() {
           })
         }
       }, 100)
+    } else {
+      console.log("❌ No results available");
     }
   }, [results])
 
@@ -76,33 +103,29 @@ export default function Home() {
     // Here you could read the file content and process it
   }
 
-  // Transform patient medical data for ResultsDisplay component format
-  const getResultsFromPatient = (patient: any) => {
-    if (!patient?.medicalData) return null;
-    
-    const medicalData = patient.medicalData;
-    return {
-      transcription: `Patient: ${medicalData.patientName}. Chief complaint: ${medicalData.chiefComplaint}. ${medicalData.historyOfPresentIllness}`,
-      soap_note: `Subjective: ${medicalData.chiefComplaint}
-
-${medicalData.historyOfPresentIllness}
-
-Objective: ${medicalData.physicalExam}
-
-Assessment: ${medicalData.assessment}
-
-Plan: ${medicalData.plan}
-
-Follow-up: ${medicalData.followUpInstructions}`,
-      diagnosis: medicalData.assessment,
-      billing_code: medicalData.billingCodes?.[0] || { code: '', description: '' },
-      prescriptions: medicalData.prescriptions || [],
-      lab_orders: [] // This could be extracted from plan if needed
+  // Test function to manually set results
+  const testSetResults = () => {
+    const testData = {
+      transcription: "Test transcription from manual button",
+      soap_note: "SUBJECTIVE:\nTest patient with test symptoms.\n\nOBJECTIVE:\nTest findings.\n\nASSESSMENT:\nTest diagnosis.\n\nPLAN:\nTest treatment plan.",
+      diagnosis: "Test Diagnosis",
+      billing_code: { code: "Z00.00", description: "Test billing code" },
+      prescriptions: [{ medication: "Test Med", dosage: "100mg", frequency: "twice daily", duration: "7 days" }],
+      lab_orders: ["Test Lab Order"]
     };
-  };
+    console.log("🧪 Setting test results manually:", testData);
+    setResults(testData);
+  }
 
-  // Get results from active patient or current results
-  const displayResults = results || getResultsFromPatient(activePatient);
+
+  // Only show results from SOAP agent, not patient mock data
+  const displayResults = results;
+  
+  // Debug logging
+  console.log("🔍 Debug - results state:", results);
+  console.log("🔍 Debug - displayResults:", displayResults);
+  console.log("🔍 Debug - isProcessing:", isProcessing);
+  console.log("🔍 Debug - activePatient:", activePatient);
 
   // Enforce auth/redirect based on role
   useEffect(() => {
@@ -197,9 +220,15 @@ Follow-up: ${medicalData.followUpInstructions}`,
           {/* Results Area */}
           {displayResults && (
             <div className="medical-card">
+              <div className="mb-4 p-4 bg-green-100 border border-green-300 rounded-lg">
+                <p className="text-green-800 font-medium">✅ SOAP Agent Results Displayed</p>
+                <p className="text-green-700 text-sm">Data received and being rendered</p>
+              </div>
               <ResultsCard results={displayResults} />
             </div>
           )}
+          
+          
           
           {!displayResults && !isProcessing && activePatient && (
             <div className="medical-card text-center py-12">
