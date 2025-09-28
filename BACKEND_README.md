@@ -25,11 +25,10 @@ pip install -r requirements.txt
 Create a `.env` file in the project root:
 
 ```env
-ASSEMBLYAI_API_KEY="your_actual_api_key_here"
 DATABASE_URL="sqlite:///./transcripts.db"
 ```
 
-**Important**: Replace `your_actual_api_key_here` with your real AssemblyAI API key.
+**Note**: The application now uses local audio transcription via OpenAI Whisper instead of external services.
 
 ### 3. Start the Server
 
@@ -146,7 +145,7 @@ WebSocket Client
 
 ### Environment Variables
 
-- `ASSEMBLYAI_API_KEY`: Your AssemblyAI API key (required)
+- `OPENAI_API_KEY`: Your OpenAI API key (required for SOAP note generation)
 - `DATABASE_URL`: SQLite database URL (default: `sqlite:///./transcripts.db`)
 
 ### AssemblyAI Configuration
@@ -213,11 +212,11 @@ uvicorn main:app --reload --log-level debug
 
 1. **"AssemblyAI API key not set"**
    - Check your `.env` file
-   - Ensure `ASSEMBLYAI_API_KEY` is set correctly
+   - Ensure `OPENAI_API_KEY` is set correctly
 
 2. **WebSocket connection fails**
    - Check if server is running on port 8000
-   - Verify WebSocket URL: `ws://localhost:8000/ws/process-visit`
+   - Verify WebSocket URL: `ws://localhost:8000/ws/transcription`
 
 3. **Database errors**
    - Check if `transcripts.db` file is writable

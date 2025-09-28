@@ -5,7 +5,7 @@ Test script for the SOAP Note Generation Agent
 import asyncio
 import os
 from dotenv import load_dotenv
-from agents.soap_agent import generate_soap_note
+from agents.mastra_soap_agent import generate_soap_note
 
 # Load environment variables
 load_dotenv()

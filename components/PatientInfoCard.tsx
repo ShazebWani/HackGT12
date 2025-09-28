@@ -4,13 +4,13 @@ import { usePatient } from '../contexts/PatientContext'
 import { Patient } from '../lib/types'
 
 interface PatientInfoProps {
-  patientName: string
-  setPatientName: (name: string) => void
-  patientDob: string
-  setPatientDob: (dob: string) => void
+  patientName?: string
+  setPatientName?: (name: string) => void
+  patientDob?: string
+  setPatientDob?: (dob: string) => void
 }
 
-const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDob }: PatientInfoProps) => {
+const PatientInfoCard = ({ patientName = '', setPatientName = () => {}, patientDob = '', setPatientDob = () => {} }: PatientInfoProps = {}) => {
   const { 
     state, 
     selectPatient, 
@@ -85,10 +85,6 @@ const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDo
       // Patient found - select them and optionally bump recency
       selectPatient(existingPatient.id);
       touchPatient(existingPatient.id);
-      
-      // Update the legacy form fields for compatibility
-      setPatientName(`${existingPatient.firstName} ${existingPatient.lastName}`);
-      setPatientDob(existingPatient.dateOfBirth);
       
       // Clear form and search query
       clearForm();
@@ -234,36 +230,6 @@ const PatientInfoCard = ({ patientName, setPatientName, patientDob, setPatientDo
             </button>
           </div>
         </form>
-
-        {/* Legacy fields for backward compatibility */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 pt-6 border-t border-gray-200">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Patient Name (Legacy)
-            </label>
-            <input
-              type="text"
-              value={patientName}
-              onChange={(e) => setPatientName(e.target.value)}
-              placeholder="Enter patient name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors"
-              disabled
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Date of Birth (Legacy)
-            </label>
-            <input
-              type="date"
-              value={patientDob}
-              onChange={(e) => setPatientDob(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-1 focus:border-accent-1 outline-none transition-colors"
-              disabled
-            />
-          </div>
-        </div>
       </div>
 
       {/* New Patient Modal */}
