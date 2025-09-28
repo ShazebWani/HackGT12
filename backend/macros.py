@@ -4,77 +4,95 @@ import requests
 from dotenv import load_dotenv
 from transformers import pipeline
 
-# Load USDA API key from .env file
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env.local"))
-USDA_API_KEY = os.getenv("USDA_API_KEY")
+class FoodNutritionAnalyzer:
+    """Class to classify food images and fetch nutritional information using USDA API."""
 
-if not USDA_API_KEY:
-    raise ValueError("Missing USDA_API_KEY. Put it in your .env file.")
+    MACRO_NUTRIENTS = ["Protein", "Carbohydrate, by difference", "Total lipid (fat)", "Energy"]
 
-# Step 1: Food classification using Hugging Face model
-pipe = pipeline("image-classification", model="prithivMLmods/Food-101-93M")
-results = pipe("/Users/khwaj/Documents/GitHub/HackGT12/backend/test/waffles.jpg", top_k=5)  # Get top 5 predictions
+    def __init__(self, usda_api_key: str | None = None):
+        # Load USDA API key from environment if not provided
+        if not usda_api_key:
+            load_dotenv(os.path.join(os.path.dirname(__file__), ".env.local"))
+            usda_api_key = os.getenv("USDA_API_KEY")
 
-# Step 2: Query USDA FoodData Central API
-def get_food_nutrition(food_query: str):
-    search_url = "https://api.nal.usda.gov/fdc/v1/foods/search"
-    params = {
-        "api_key": USDA_API_KEY,
-        "query": food_query,
-        "pageSize": 1
-    }
-    response = requests.get(search_url, params=params)
-    response.raise_for_status()
-    data = response.json()
+        if not usda_api_key:
+            raise ValueError("Missing USDA_API_KEY. Put it in your .env file or provide it directly.")
 
-    if not data.get("foods"):
-        return {"error": "No results found"}
+        self.usda_api_key = usda_api_key
+        # Initialize Hugging Face food classification pipeline
+        self.pipe = pipeline("image-classification", model="prithivMLmods/Food-101-93M")
 
-    food_item = data["foods"][0]
+    def classify_food(self, image_path: str, top_k: int = 5):
+        """Classify food in the image and return top_k predictions."""
+        return self.pipe(image_path, top_k=top_k)
 
-    # Extract only macros
-    nutrients = {}
-    for nutrient in food_item.get("foodNutrients", []):
-        name = nutrient.get("nutrientName")
-        value = nutrient.get("value")
-        unit = nutrient.get("unitName")
-        if name in ["Protein", "Carbohydrate, by difference", "Total lipid (fat)", "Energy"]:
-            nutrients[name] = f"{value} {unit}"
+    def get_food_nutrition(self, food_query: str) -> dict:
+        """Query USDA FoodData Central API for a food item and return macros."""
+        search_url = "https://api.nal.usda.gov/fdc/v1/foods/search"
+        params = {
+            "api_key": self.usda_api_key,
+            "query": food_query,
+            "pageSize": 1
+        }
 
-    return {
-        "description": food_item.get("description"),
-        "fdcId": food_item.get("fdcId"),
-        "nutrients": nutrients
-    }
+        response = requests.get(search_url, params=params)
+        response.raise_for_status()
+        data = response.json()
 
-# Step 3: Process all predictions
-foods_output = []
-for res in results:
-    food_name = res["label"]
-    confidence = round(res["score"], 3)
-    nutrition = get_food_nutrition(food_name)
+        if not data.get("foods"):
+            return {"error": "No results found"}
 
-    foods_output.append({
-        "food_prediction": food_name,
-        "confidence": confidence,
-        "nutrition": nutrition
-    })
+        food_item = data["foods"][0]
 
-# Print in pretty JSON format
-foods_obj = json.dumps(foods_output, indent=2)
-# print(foods_obj)
+        # Extract only macro nutrients
+        nutrients = {}
+        for nutrient in food_item.get("foodNutrients", []):
+            name = nutrient.get("nutrientName")
+            value = nutrient.get("value")
+            unit = nutrient.get("unitName")
+            if name in self.MACRO_NUTRIENTS:
+                nutrients[name] = f"{value} {unit}"
 
-for i, food in enumerate(foods_output, 1):
-    nutrition = food.get("nutrition", {})
-    
-    if "error" in nutrition:
-        continue
-    else:
-        print(f"{i}. Food Prediction: {food['food_prediction']} (Confidence: {food['confidence']*100:.1f}%)")
-        print(f"   Description: {nutrition.get('description', 'N/A')}")
-        print("   Nutrients:")
-        for key, value in nutrition.get("nutrients", {}).items():
-            print(f"     - {key}: {value}")
-    print("-" * 40)
+        return {
+            "description": food_item.get("description"),
+            "fdcId": food_item.get("fdcId"),
+            "nutrients": nutrients
+        }
+
+    def analyze_image(self, image_path: str, top_k: int = 5) -> list[dict]:
+        """Classify an image and fetch nutrition info for all top predictions."""
+        results = self.classify_food(image_path, top_k=top_k)
+        foods_output = []
+
+        for res in results:
+            food_name = res["label"]
+            confidence = round(res["score"], 3)
+            nutrition = self.get_food_nutrition(food_name)
+
+            foods_output.append({
+                "food_prediction": food_name,
+                "confidence": confidence,
+                "nutrition": nutrition
+            })
+
+        return foods_output
+
+    def display_results(self, foods_output: list[dict]):
+        """Print formatted nutrition info to the console."""
+        for i, food in enumerate(foods_output, 1):
+            nutrition = food.get("nutrition", {})
+            if "error" in nutrition:
+                continue
+            else:
+                print(f"{i}. Food Prediction: {food['food_prediction']} (Confidence: {food['confidence']*100:.1f}%)")
+                print(f"   Description: {nutrition.get('description', 'N/A')}")
+                print("   Nutrients:")
+                for key, value in nutrition.get("nutrients", {}).items():
+                    print(f"     - {key}: {value}")
+            print("-" * 40)
 
 
+if __name__ == "__main__":
+    analyzer = FoodNutritionAnalyzer()
+    foods = analyzer.analyze_image("/Users/khwaj/Documents/GitHub/HackGT12/backend/test/waffles.jpg")
+    analyzer.display_results(foods)
